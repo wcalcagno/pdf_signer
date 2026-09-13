@@ -27,7 +27,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPdfRasterizer, Platforms.Android.AndroidPdfRasterizer>();
         builder.Services.AddSingleton<IFileExporter, ShareFileExporter>();
 #elif IOS || MACCATALYST
-        builder.Services.AddSingleton<IPdfRasterizer, Platforms.Apple.ApplePdfRasterizer>();
+        builder.Services.AddSingleton<IPdfRasterizer, ApplePdfRasterizer>();
         builder.Services.AddSingleton<IFileExporter, ShareFileExporter>();
 #endif
 

@@ -1,14 +1,17 @@
+#if IOS || MACCATALYST
 using CoreGraphics;
 using Foundation;
 using PdfSigner.Core;
 using UIKit;
 
-namespace PdfSigner.App.Platforms.Apple;
+namespace PdfSigner.App.Services;
 
 /// <summary>Rasteriza páginas con CoreGraphics, compartido por iOS y macCatalyst.</summary>
 /// <remarks>
-/// El csproj enlaza este archivo también desde macCatalyst: la API de CoreGraphics es idéntica
-/// en ambos, así que duplicarlo no aportaría nada.
+/// Vive fuera de Platforms/ a propósito. Al estar en Platforms/iOS, macCatalyst no lo
+/// compilaba, e incluirlo a mano en el csproj provocaba NETSDK1022 por duplicado. Un
+/// archivo normal protegido con #if evita por completo las reglas de inclusión por
+/// plataforma, que es el patrón recomendado para código compartido entre iOS y Catalyst.
 ///
 /// Es la pieza que más pesa en la decisión de no usar PDFium: la incidencia abierta de
 /// PDFtoImage (#141) describe rechazos de App Store porque libpdfium.dylib no viaja empaquetado
@@ -84,3 +87,4 @@ public sealed class ApplePdfRasterizer : IPdfRasterizer
         return Task.FromResult(new RenderedPage(png.ToArray(), targetWidthPx, height));
     }
 }
+#endif

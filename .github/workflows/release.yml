@@ -59,8 +59,10 @@ jobs:
           distribution: microsoft
           java-version: '17'
 
+      # En Linux solo se puede instalar maui-android: el workload maui completo
+      # incluye iOS, macCatalyst y Windows, y su instalacion falla en este runner.
       - name: Instalar workloads de MAUI
-        run: dotnet workload install maui --skip-manifest-update
+        run: dotnet workload install maui-android --skip-manifest-update
 
       # AndroidKeyStore=false firma con la clave de depuración. Es suficiente para
       # instalar el APK a mano, que es como se distribuye fuera de Play Store. Subir a
