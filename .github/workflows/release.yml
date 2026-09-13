@@ -60,7 +60,7 @@ jobs:
           java-version: '17'
 
       - name: Instalar workloads de MAUI
-        run: dotnet workload install maui-android --skip-manifest-update
+        run: dotnet workload install maui --skip-manifest-update
 
       # AndroidKeyStore=false firma con la clave de depuración. Es suficiente para
       # instalar el APK a mano, que es como se distribuye fuera de Play Store. Subir a
@@ -74,6 +74,7 @@ jobs:
           -f net10.0-android -c Release
           -p:AndroidPackageFormat=apk
           -p:AndroidKeyStore=false
+          -p:RuntimeIdentifier=android-arm64
 
       - uses: actions/upload-artifact@v7
         with:
@@ -97,12 +98,21 @@ jobs:
       - name: Seleccionar Xcode compatible
         run: |
           ls /Applications | grep -i '^Xcode' || true
-          for v in 26.0 26.1 26.2; do
-            if [ -d "/Applications/Xcode_$v.app" ]; then
-              sudo xcode-select -s "/Applications/Xcode_$v.app"
+          # No basta con que la carpeta exista: en los runners hay instalaciones
+          # parciales de Xcode sin el SDK de macOS, y al seleccionarlas el build
+          # revienta mas tarde con "actool not found". Se comprueba el SDK antes.
+          elegido=""
+          for c in /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app /Applications/Xcode.app; do
+            if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
+              elegido="$c"
               break
             fi
           done
+          if [ -z "$elegido" ]; then
+            echo "No se encontro ningun Xcode con el SDK de macOS completo"; exit 1
+          fi
+          echo "Usando $elegido"
+          sudo xcode-select -s "$elegido"
           xcodebuild -version
 
       - name: Instalar workloads de MAUI
@@ -150,12 +160,21 @@ jobs:
       - name: Seleccionar Xcode compatible
         run: |
           ls /Applications | grep -i '^Xcode' || true
-          for v in 26.0 26.1 26.2; do
-            if [ -d "/Applications/Xcode_$v.app" ]; then
-              sudo xcode-select -s "/Applications/Xcode_$v.app"
+          # No basta con que la carpeta exista: en los runners hay instalaciones
+          # parciales de Xcode sin el SDK de macOS, y al seleccionarlas el build
+          # revienta mas tarde con "actool not found". Se comprueba el SDK antes.
+          elegido=""
+          for c in /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app /Applications/Xcode.app; do
+            if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
+              elegido="$c"
               break
             fi
           done
+          if [ -z "$elegido" ]; then
+            echo "No se encontro ningun Xcode con el SDK de macOS completo"; exit 1
+          fi
+          echo "Usando $elegido"
+          sudo xcode-select -s "$elegido"
           xcodebuild -version
 
       - name: Instalar workloads de MAUI
