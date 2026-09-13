@@ -132,10 +132,18 @@ jobs:
           -p:RuntimeIdentifier=maccatalyst-x64
           -o artefactos/mac
 
+      # El .app no queda siempre en la raiz de la carpeta de salida, asi que se busca.
+      # ditto conserva los metadatos del bundle mejor que zip.
       - name: Comprimir el .app
         run: |
-          cd artefactos/mac
-          zip -r -y ../../PdfSigner-macos.zip *.app
+          app=$(find artefactos/mac -maxdepth 3 -name '*.app' -type d | head -1)
+          if [ -z "$app" ]; then
+            echo "No se encontro ningun .app. Contenido generado:"
+            find artefactos/mac -maxdepth 3 | head -40
+            exit 1
+          fi
+          echo "Empaquetando $app"
+          ditto -c -k --keepParent "$app" PdfSigner-macos.zip
 
       - uses: actions/upload-artifact@v7
         with:
@@ -182,11 +190,16 @@ jobs:
       - name: Instalar workloads de MAUI
         run: dotnet workload install maui --skip-manifest-update
 
-      - name: Compilar para el simulador
+      # Se compila para dispositivo y no para simulador: el runner no trae un runtime de
+      # simulador que case con el SDK del Xcode seleccionado, y actool falla por eso. La
+      # firma va desactivada porque no hay cuenta de Apple; basta para validar el codigo.
+      - name: Compilar para dispositivo
         run: >
           dotnet build src/PdfSigner.App/PdfSigner.App.csproj
           -f net10.0-ios -c Release
-          -p:RuntimeIdentifier=iossimulator-x64
+          -p:RuntimeIdentifier=ios-arm64
+          -p:EnableCodeSigning=false
+          -p:CodesignRequireProvisioningProfile=false
 
   # --------------------------------------------------------------- Release
   publicar:

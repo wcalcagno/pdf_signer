@@ -55,7 +55,9 @@ public sealed class AndroidPdfRasterizer : IPdfRasterizer
 
             // PdfRenderer dibuja sobre fondo transparente. Sin pintarlo de blanco antes, una
             // página normal se vería como un rectángulo transparente sobre el fondo de la app.
-            bitmap.EraseColor(Android.Graphics.Color.White.ToArgb());
+            // Hace falta global:: porque el namespace de este archivo
+            // (PdfSigner.App.Platforms.Android) tapa al namespace Android.
+            bitmap.EraseColor(global::Android.Graphics.Color.White.ToArgb());
             page.Render(bitmap, null, null, PdfRenderMode.ForDisplay);
 
             using var ms = new MemoryStream();
