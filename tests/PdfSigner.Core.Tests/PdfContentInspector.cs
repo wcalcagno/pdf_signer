@@ -51,15 +51,26 @@ internal sealed partial class PdfContentInspector
     /// Esquina inferior izquierda de la imagen en el espacio del MediaBox, componiendo la
     /// matriz de página con la propia de la imagen. Es la comprobación geométrica de verdad.
     /// </summary>
+    /// <remarks>
+    /// PDFsharp no acumula sus transformaciones en la matriz de la imagen: emite un "cm" por
+    /// cada una (desplazamiento del MediaBox, giro de la página, y la propia de la imagen).
+    /// Por eso hay que componerlas todas y no solo una.
+    ///
+    /// En PDF, "cm" concatena como CTM = M x CTM_anterior, de modo que el punto pasa primero
+    /// por la ÚLTIMA matriz emitida y al final por la primera: se recorren en orden inverso.
+    /// </remarks>
     public (double X, double Y) ComposedImageOrigin()
     {
-        var page = Matrices.FirstOrDefault(m => Math.Abs(m[1]) > 0.001 || Math.Abs(m[2]) > 0.001)
-                   ?? [1, 0, 0, 1, 0, 0];
-        var img = ImageMatrices.Single();
+        double x = 0, y = 0;
 
-        // En PDF, "cm" concatena: primero la matriz de la imagen y luego la de la página.
-        return (page[0] * img[4] + page[2] * img[5] + page[4],
-                page[1] * img[4] + page[3] * img[5] + page[5]);
+        foreach (var m in Matrices.Reverse())
+        {
+            var nx = m[0] * x + m[2] * y + m[4];
+            var ny = m[1] * x + m[3] * y + m[5];
+            (x, y) = (nx, ny);
+        }
+
+        return (x, y);
     }
 
     private static double[] Parse(Match m) =>

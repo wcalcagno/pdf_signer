@@ -32,6 +32,15 @@ public sealed class PageGeometry
     /// <summary>Rotación normalizada a 0, 90, 180 o 270.</summary>
     public int Rotation { get; }
 
+    /// <summary>Esquina inferior izquierda del MediaBox. Casi siempre (0,0), pero no siempre.</summary>
+    public double OriginX { get; }
+
+    /// <summary>Componente vertical del origen del MediaBox.</summary>
+    public double OriginY { get; }
+
+    /// <summary>True si el MediaBox no arranca en el origen de coordenadas.</summary>
+    public bool HasOffsetOrigin => Math.Abs(OriginX) > 0.001 || Math.Abs(OriginY) > 0.001;
+
     /// <summary>Ancho tal como lo ve el usuario (ya intercambiado si la página está rotada).</summary>
     public double VisibleWidthPt => IsQuarterTurned ? RawHeightPt : RawWidthPt;
 
@@ -41,13 +50,17 @@ public sealed class PageGeometry
     /// <summary>True si la rotación intercambia ancho y alto (90° o 270°).</summary>
     public bool IsQuarterTurned => Rotation == 90 || Rotation == 270;
 
-    public PageGeometry(double rawWidthPt, double rawHeightPt, int rotation)
+    public PageGeometry(
+        double rawWidthPt, double rawHeightPt, int rotation,
+        double originX = 0, double originY = 0)
     {
         if (rawWidthPt <= 0 || rawHeightPt <= 0)
             throw new ArgumentOutOfRangeException(nameof(rawWidthPt), "Las dimensiones deben ser positivas.");
 
         RawWidthPt = rawWidthPt;
         RawHeightPt = rawHeightPt;
+        OriginX = originX;
+        OriginY = originY;
 
         // Los PDFs reales traen valores como -90 o 450; normalizamos a [0,360) en pasos de 90.
         var r = ((rotation % 360) + 360) % 360;
@@ -59,7 +72,7 @@ public sealed class PageGeometry
         // Se usa el MediaBox y no page.Width/Height para no depender de si PDFsharp ya
         // aplicó o no la rotación internamente: el MediaBox es siempre el rectángulo crudo.
         var box = page.MediaBox;
-        return new PageGeometry(box.Width, box.Height, page.Rotate);
+        return new PageGeometry(box.Width, box.Height, page.Rotate, box.X1, box.Y1);
     }
 
     /// <summary>Convierte un rectángulo normalizado al rectángulo en puntos del espacio visible.</summary>
@@ -86,6 +99,16 @@ public sealed class PageGeometry
     /// </remarks>
     public void ApplyRotationTransform(XGraphics gfx)
     {
+        // PDFsharp trabaja como si el MediaBox empezara siempre en (0,0). Cuando no es así
+        // —habitual en PDFs de imprenta o recortados— la firma se desplaza exactamente ese
+        // offset. Se corrige antes de rotar, para que el giro ocurra en coordenadas locales
+        // de la página.
+        //
+        // El signo de Y va invertido porque XGraphics tiene el eje hacia abajo y PDFsharp
+        // convierte con pdf_y = alto - y: para sumar OriginY al resultado hay que restarlo aquí.
+        if (HasOffsetOrigin)
+            gfx.TranslateTransform(OriginX, -OriginY);
+
         switch (Rotation)
         {
             case 90:
