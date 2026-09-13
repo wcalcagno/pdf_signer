@@ -80,16 +80,25 @@
             lo que se ponga en ella (fase 3) conserva su tamaño real sea cual sea la
             ampliación de la página.
         -->
-        <Grid x:Name="RegionCanvas" Grid.Row="1" Grid.Column="0" Style="{StaticResource RegionCanvas}">
+        <Grid x:Name="RegionCanvas" Grid.Row="1" Grid.Column="0"
+              Style="{StaticResource RegionCanvas}"
+              SizeChanged="OnCanvasResized">
 
             <!-- Capa 1: la página, con desplazamiento y zoom. -->
             <ScrollView Orientation="Both">
-                <Grid Padding="20" HorizontalOptions="Center" VerticalOptions="Center">
+                <Grid Padding="24" HorizontalOptions="Center" VerticalOptions="Center">
+                    <!--
+                        El zoom cambia el TAMAÑO de la página, no su Scale. Scale no afecta al
+                        layout: el hueco seguiría midiendo lo original, el ScrollView calcularía
+                        mal su recorrido y la página se dibujaría estirada. Además, con tamaño
+                        real los bordes de selección y las asas no se escalan y conservan su
+                        tamaño en pantalla a cualquier ampliación.
+                    -->
                     <Grid x:Name="PageHost"
-                          WidthRequest="{Binding CanvasWidth}"
-                          HeightRequest="{Binding CanvasHeight}"
-                          AnchorX="0" AnchorY="0"
-                          Scale="{Binding Zoom}">
+                          WidthRequest="{Binding DisplayWidth}"
+                          HeightRequest="{Binding DisplayHeight}"
+                          HorizontalOptions="Center"
+                          VerticalOptions="Center">
 
                         <Image Source="{Binding CurrentPageImage}" Aspect="Fill" />
 
@@ -146,9 +155,56 @@
                 </Grid>
             </ScrollView>
 
-            <!-- Capa 2: superposiciones que NO deben escalar con el zoom.
-                 La barra contextual flotante llega en la fase 3. -->
-            <Grid x:Name="CapaFlotante" InputTransparent="True" />
+            <!--
+                Capa 2: superposiciones sobre la página.
+
+                InputTransparent con CascadeInputTransparent="False" es la combinación que hace
+                falta: la capa en sí deja pasar los clics a la página que tiene debajo, pero sus
+                hijos sí los reciben. Sin desactivar la cascada, la barra flotante sería
+                decorativa y no respondería a nada.
+            -->
+            <Grid x:Name="CapaFlotante" InputTransparent="True" CascadeInputTransparent="False">
+
+                <!--
+                    Barra contextual. Va anclada arriba y centrada, NO junto al elemento
+                    seleccionado. Colocarla junto al elemento obligaría a traducir coordenadas
+                    de página a pantalla contando zoom y desplazamiento del ScrollView, saldría
+                    fuera de la vista al arrastrar hacia un borde, y daría saltos mientras se
+                    mueve la firma. Anclada es más simple y más estable de leer.
+                -->
+                <Border IsVisible="{Binding HasSelection}"
+                        HorizontalOptions="Center"
+                        VerticalOptions="Start"
+                        Margin="0,14,0,0"
+                        Padding="6"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource Separador}, Dark={StaticResource SeparadorOscuro}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource FondoBarra}, Dark={StaticResource FondoBarraOscuro}}">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="{Binding SelectedKindLabel}"
+                               FontSize="12"
+                               VerticalOptions="Center"
+                               Margin="8,0,4,0"
+                               TextColor="{StaticResource TextoTenue}" />
+
+                        <Button Text="Guardar favorita"
+                                Command="{Binding SaveFavoriteCommand}"
+                                FontSize="12"
+                                Padding="12,4"
+                                HeightRequest="34" />
+
+                        <Button Text="Eliminar"
+                                Command="{Binding DeleteSelectedCommand}"
+                                FontSize="12"
+                                Padding="12,4"
+                                HeightRequest="34" />
+                    </HorizontalStackLayout>
+                </Border>
+            </Grid>
 
             <!-- Aviso cuando todavía no hay documento. -->
             <Label Text="Abre un PDF para empezar"

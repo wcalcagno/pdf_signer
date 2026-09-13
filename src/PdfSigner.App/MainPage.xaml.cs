@@ -95,6 +95,31 @@ public partial class MainPage : ContentPage
         Grid.SetColumnSpan(RegionNavegador, 1);
     }
 
+    /// <summary>
+    /// Comunica al ViewModel el tamaño visible de la página para poder ajustar la ampliación.
+    /// </summary>
+    /// <remarks>
+    /// Hace falta un evento porque el ViewModel no puede conocer por su cuenta el tamaño de un
+    /// control, y ese dato es imprescindible para calcular el zoom que hace entrar la página
+    /// entera en pantalla.
+    /// </remarks>
+    private void OnCanvasResized(object? sender, EventArgs e)
+    {
+        if (RegionCanvas.Width <= 0 || RegionCanvas.Height <= 0)
+            return;
+
+        var primeraVez = !_viewportConocido;
+        _viewportConocido = true;
+        _vm.SetViewport(RegionCanvas.Width, RegionCanvas.Height);
+
+        // Solo se reajusta la primera vez. Después el zoom es del usuario, y recolocárselo
+        // cada vez que redimensiona la ventana sería exasperante.
+        if (primeraVez)
+            _vm.ZoomToFit();
+    }
+
+    private bool _viewportConocido;
+
     private void OnElementTapped(object? sender, TappedEventArgs e)
     {
         if (Resolve(sender) is { } vm)
@@ -120,9 +145,10 @@ public partial class MainPage : ContentPage
                 _lastPanX = e.TotalX;
                 _lastPanY = e.TotalY;
 
-                // El desplazamiento llega en unidades de pantalla; si la página está ampliada
-                // hay que dividir por el zoom o el elemento se movería más rápido que el dedo.
-                vm.Move(dx / _vm.Zoom, dy / _vm.Zoom);
+                // No hace falta dividir por el zoom: desde que la ampliación cambia el tamaño
+                // real de la página, el lienzo de referencia de los elementos ya está en
+                // píxeles de pantalla.
+                vm.Move(dx, dy);
                 break;
         }
     }
@@ -144,7 +170,7 @@ public partial class MainPage : ContentPage
                 var dy = e.TotalY - _lastPanY;
                 _lastPanX = e.TotalX;
                 _lastPanY = e.TotalY;
-                vm.Resize(dx / _vm.Zoom, dy / _vm.Zoom);
+                vm.Resize(dx, dy);
                 break;
         }
     }

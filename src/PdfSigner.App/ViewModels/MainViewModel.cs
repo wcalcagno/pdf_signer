@@ -464,6 +464,10 @@ public sealed partial class MainViewModel : ObservableObject
         CanvasWidth = rendered.PixelWidth;
         CanvasHeight = rendered.PixelHeight;
 
+        // La página se rasteriza a 1200 px de ancho, bastante más que la ventana típica.
+        // Sin ajustar, el usuario abre su documento y ve un trozo de la esquina superior.
+        ZoomToFit();
+
         foreach (var page in Pages)
             page.IsCurrent = page.Index == index;
 
@@ -507,7 +511,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void Register(ElementViewModel vm)
     {
-        vm.SetCanvasSize(CanvasWidth, CanvasHeight);
+        vm.SetCanvasSize(DisplayWidth, DisplayHeight);
         Elements.Add(vm);
         RefreshVisibleElements();
         Select(vm);
@@ -519,19 +523,68 @@ public sealed partial class MainViewModel : ObservableObject
 
         foreach (var element in Elements.Where(e => e.PageIndex == CurrentPageIndex))
         {
-            element.SetCanvasSize(CanvasWidth, CanvasHeight);
+            element.SetCanvasSize(DisplayWidth, DisplayHeight);
             VisibleElements.Add(element);
         }
+    }
+
+    // ---- Tamaño con el que se DIBUJA la página ----
+    //
+    // La página no se amplía con un Scale sino cambiando su tamaño real. Scale no afecta al
+    // layout: el hueco seguiría midiendo el original, el ScrollView calcularía mal su
+    // recorrido y la página se dibujaría estirada sobre un contenedor que no le corresponde.
+    //
+    // Con tamaño real hay además un efecto secundario valioso: los bordes de selección y las
+    // asas de redimensionado NO se escalan, así que conservan su tamaño en pantalla a
+    // cualquier ampliación. Con Scale habría que compensarlos uno a uno.
+
+    public double DisplayWidth => CanvasWidth * Zoom;
+
+    public double DisplayHeight => CanvasHeight * Zoom;
+
+    private double _viewportWidth;
+    private double _viewportHeight;
+
+    /// <summary>Informa del tamaño visible del área de la página.</summary>
+    public void SetViewport(double width, double height)
+    {
+        _viewportWidth = width;
+        _viewportHeight = height;
+    }
+
+    /// <summary>Ajusta la ampliación para que la página entre entera en pantalla.</summary>
+    /// <remarks>
+    /// Sin esto, un A4 rasterizado a 1200 px se abre más grande que la ventana y el usuario
+    /// ve la esquina superior izquierda de su documento sin entender por qué.
+    /// </remarks>
+    public void ZoomToFit()
+    {
+        if (CanvasWidth <= 0 || CanvasHeight <= 0 || _viewportWidth <= 0 || _viewportHeight <= 0)
+            return;
+
+        const double margen = 48;
+        var ajuste = Math.Min(
+            (_viewportWidth - margen) / CanvasWidth,
+            (_viewportHeight - margen) / CanvasHeight);
+
+        Zoom = Math.Clamp(ajuste, 0.1, 2);
     }
 
     partial void OnCanvasWidthChanged(double value) => PropagateCanvasSize();
 
     partial void OnCanvasHeightChanged(double value) => PropagateCanvasSize();
 
+    partial void OnZoomChanged(double value) => PropagateCanvasSize();
+
     private void PropagateCanvasSize()
     {
+        OnPropertyChanged(nameof(DisplayWidth));
+        OnPropertyChanged(nameof(DisplayHeight));
+
+        // Los elementos trabajan en píxeles de pantalla, así que su lienzo de referencia es
+        // el tamaño ya ampliado. Gracias a eso los gestos no necesitan dividir por el zoom.
         foreach (var element in Elements)
-            element.SetCanvasSize(CanvasWidth, CanvasHeight);
+            element.SetCanvasSize(DisplayWidth, DisplayHeight);
     }
 
     private async Task RunBusyAsync(string message, Func<Task> work)
