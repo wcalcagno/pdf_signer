@@ -88,11 +88,36 @@ public partial class MainPage : ContentPage
         if (Application.Current?.Resources.TryGetValue("AltoBottomSheet", out var alto) == true
             && alto is double altoSheet)
         {
-            Inspector.HeightRequest = altoSheet;
+            _altoSheet = altoSheet;
         }
+
+        Inspector.HeightRequest = _altoSheet;
 
         Grid.SetRow(RegionNavegador, 3);
         Grid.SetColumnSpan(RegionNavegador, 1);
+
+        // Parte oculto, fuera de pantalla, y entra deslizándose al seleccionar algo.
+        Inspector.TranslationY = _altoSheet;
+        _vm.PropertyChanged += AnimarPanelInferior;
+    }
+
+    private double _altoSheet = 200;
+
+    /// <summary>Desliza el panel inferior al aparecer y desaparecer la selección.</summary>
+    /// <remarks>
+    /// Se anima TranslationY y no la altura de la fila: GridLength.Auto no es un valor
+    /// numérico, así que no se puede interpolar entre 0 y Auto. Desplazar el panel logra el
+    /// mismo efecto visual con una propiedad que sí admite animación.
+    ///
+    /// PENDIENTE: sin ejecutar en un teléfono, como todo lo específico de móvil.
+    /// </remarks>
+    private async void AnimarPanelInferior(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainViewModel.HasSelection))
+            return;
+
+        var destino = _vm.HasSelection ? 0 : _altoSheet;
+        await Inspector.TranslateTo(0, destino, 180, Easing.CubicOut);
     }
 
     /// <summary>

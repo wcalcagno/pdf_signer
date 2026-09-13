@@ -49,30 +49,125 @@
                            FontAttributes="Bold" />
 
                     <!-- Bloque de texto. -->
-                    <VerticalStackLayout Spacing="8" IsVisible="{Binding SelectedIsText}">
+                    <VerticalStackLayout Spacing="10" IsVisible="{Binding SelectedIsText}">
 
-                        <Editor Text="{Binding SelectedText, Mode=TwoWay}"
-                                Placeholder="Nombre, cargo, {fecha}..."
-                                AutoSize="TextChanges"
-                                MinimumHeightRequest="90"
-                                MaxLength="500" />
+                        <!--
+                            Resumen plegado. Un Editor multilínea siempre desplegado se comía
+                            media columna para algo que se escribe una vez y luego se deja
+                            quieto; aquí ocupa dos líneas hasta que se pide editarlo.
+                        -->
+                        <Border IsVisible="{Binding IsNotEditingText}"
+                                Padding="10,8"
+                                StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Separador}, Dark={StaticResource SeparadorOscuro}}">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="6" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="{Binding SelectedTextSummary}"
+                                       FontSize="13"
+                                       LineBreakMode="TailTruncation" />
+                                <Label Text="{Binding SelectedTextDetail}"
+                                       FontSize="11"
+                                       TextColor="{StaticResource TextoTenue}" />
+                            </VerticalStackLayout>
+                        </Border>
 
-                        <Label Text="Tamaño" Style="{StaticResource EtiquetaSeccion}" />
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Button Text="Editar texto"
+                                Command="{Binding ToggleTextEditCommand}"
+                                FontSize="12"
+                                HeightRequest="36"
+                                IsVisible="{Binding IsNotEditingText}" />
+
+                        <!-- Edición completa, bajo demanda. -->
+                        <VerticalStackLayout Spacing="6" IsVisible="{Binding IsEditingText}">
+                            <Editor Text="{Binding SelectedText, Mode=TwoWay}"
+                                    Placeholder="Nombre, cargo, {fecha}..."
+                                    AutoSize="TextChanges"
+                                    MinimumHeightRequest="110"
+                                    MaxLength="500" />
+                            <Label Text="Puedes usar {fecha}, {hora} y {fechalarga}. Se sustituyen al exportar."
+                                   FontSize="10"
+                                   TextColor="{StaticResource TextoTenue}" />
+                            <Button Text="Listo"
+                                    Command="{Binding ToggleTextEditCommand}"
+                                    FontSize="12"
+                                    HeightRequest="36" />
+                        </VerticalStackLayout>
+
+                        <Label Text="TAMAÑO" Style="{StaticResource EtiquetaSeccion}" />
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                             <Stepper Grid.Column="0"
                                      Minimum="6" Maximum="48" Increment="1"
-                                     Value="{Binding SelectedFontSizePt, Mode=TwoWay}"
-                                     HorizontalOptions="Start" />
+                                     Value="{Binding SelectedFontSizePt, Mode=TwoWay}" />
                             <Label Grid.Column="1"
                                    Text="{Binding SelectedFontSizePt, StringFormat='{0:F0} pt'}"
                                    VerticalOptions="Center"
+                                   HorizontalOptions="End"
                                    FontSize="13" />
                         </Grid>
 
-                        <!-- Fase 4 sustituye este campo por una paleta de muestras. -->
-                        <Label Text="Color" Style="{StaticResource EtiquetaSeccion}" />
-                        <Entry Text="{Binding SelectedColorHex, Mode=TwoWay}"
-                               Placeholder="#000000" />
+                        <!--
+                            Paleta de color. Sustituye al campo hexadecimal que había antes:
+                            pedir "#14145A" a quien solo quiere firmar un contrato es pedirle
+                            un formato que no tiene por qué conocer.
+
+                            Se usa BindableLayout sobre un FlexLayout y no un CollectionView.
+                            Son ocho elementos fijos, no hace falta virtualizar, y en este
+                            proyecto CollectionView ya dio un fallo silencioso al colocarlo en
+                            un contenedor sin tamaño definido.
+                        -->
+                        <Label Text="COLOR" Style="{StaticResource EtiquetaSeccion}" />
+                        <FlexLayout BindableLayout.ItemsSource="{Binding ColorSwatches}"
+                                    Wrap="Wrap"
+                                    JustifyContent="Start"
+                                    AlignItems="Center">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ColorSwatchViewModel">
+                                    <Border Margin="0,0,8,8"
+                                            WidthRequest="30"
+                                            HeightRequest="30"
+                                            Padding="0"
+                                            BackgroundColor="{Binding Color}"
+                                            Stroke="{Binding BorderColor}"
+                                            StrokeThickness="{Binding BorderThickness}"
+                                            SemanticProperties.Description="{Binding Nombre}">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="6" />
+                                        </Border.StrokeShape>
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnSwatchTapped" />
+                                        </Border.GestureRecognizers>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </FlexLayout>
+
+                        <Button Text="Otro color…"
+                                Command="{Binding ToggleCustomColorCommand}"
+                                FontSize="12"
+                                HeightRequest="34" />
+
+                        <!--
+                            Tres deslizadores en vez de un selector nativo: MAUI no tiene
+                            ninguno, y no existe API multiplataforma para ello.
+                        -->
+                        <VerticalStackLayout Spacing="4" IsVisible="{Binding IsCustomColorOpen}">
+                            <Border HeightRequest="26"
+                                    BackgroundColor="{Binding SelectedColorPreview}"
+                                    StrokeThickness="1"
+                                    Stroke="{AppThemeBinding Light={StaticResource Separador}, Dark={StaticResource SeparadorOscuro}}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="4" />
+                                </Border.StrokeShape>
+                            </Border>
+                            <Label Text="Rojo" FontSize="10" TextColor="{StaticResource TextoTenue}" />
+                            <Slider Minimum="0" Maximum="255" Value="{Binding ColorR, Mode=TwoWay}" />
+                            <Label Text="Verde" FontSize="10" TextColor="{StaticResource TextoTenue}" />
+                            <Slider Minimum="0" Maximum="255" Value="{Binding ColorG, Mode=TwoWay}" />
+                            <Label Text="Azul" FontSize="10" TextColor="{StaticResource TextoTenue}" />
+                            <Slider Minimum="0" Maximum="255" Value="{Binding ColorB, Mode=TwoWay}" />
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
 
                     <!-- Imagen de firma. -->

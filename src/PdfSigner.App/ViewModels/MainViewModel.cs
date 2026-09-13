@@ -311,6 +311,8 @@ public sealed partial class MainViewModel : ObservableObject
 
             s.Text = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedTextSummary));
+            OnPropertyChanged(nameof(SelectedTextDetail));
         }
     }
 
@@ -337,7 +339,147 @@ public sealed partial class MainViewModel : ObservableObject
 
             s.ColorHex = value;
             OnPropertyChanged();
+            NotificarColor();
         }
+    }
+
+    // ---- Edición del texto en dos pasos ----
+    //
+    // El inspector muestra por defecto un resumen de una línea. El editor multilínea solo
+    // aparece al pedirlo. Un Editor siempre desplegado se come la mitad del panel para algo
+    // que se toca una vez y luego se deja quieto.
+
+    [ObservableProperty]
+    public partial bool IsEditingText { get; set; }
+
+    /// <summary>Primera línea con contenido, recortada, para el resumen.</summary>
+    public string SelectedTextSummary
+    {
+        get
+        {
+            var texto = SelectedText;
+            if (string.IsNullOrWhiteSpace(texto))
+                return "(vacío)";
+
+            var primera = texto
+                .Replace("\r\n", "\n")
+                .Split('\n')
+                .FirstOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim() ?? "(vacío)";
+
+            return primera.Length > 34 ? primera[..33] + "…" : primera;
+        }
+    }
+
+    /// <summary>Número de líneas, para dar idea del bloque sin desplegarlo.</summary>
+    public string SelectedTextDetail
+    {
+        get
+        {
+            var lineas = SelectedText.Replace("\r\n", "\n").Split('\n')
+                .Count(l => !string.IsNullOrWhiteSpace(l));
+            return lineas <= 1 ? "1 línea" : $"{lineas} líneas";
+        }
+    }
+
+    public bool IsNotEditingText => !IsEditingText;
+
+    partial void OnIsEditingTextChanged(bool value) => OnPropertyChanged(nameof(IsNotEditingText));
+
+    [RelayCommand]
+    private void ToggleTextEdit() => IsEditingText = !IsEditingText;
+
+    // ---- Paleta de color ----
+
+    public ObservableCollection<ColorSwatchViewModel> ColorSwatches { get; } =
+    [
+        new("#000000", "Negro"),
+        new("#14145A", "Azul marino"),
+        new("#0A84FF", "Azul"),
+        new("#D70015", "Rojo"),
+        new("#248A3D", "Verde"),
+        new("#5E5CE6", "Morado"),
+        new("#8B5A2B", "Marrón"),
+        new("#636366", "Gris"),
+    ];
+
+    [RelayCommand]
+    private void PickColor(ColorSwatchViewModel? swatch)
+    {
+        if (swatch is null)
+            return;
+
+        SelectedColorHex = swatch.Hex;
+    }
+
+    /// <summary>Panel de color a medida, alternativa a la paleta.</summary>
+    /// <remarks>
+    /// Son tres deslizadores RGB y no un selector nativo porque MAUI no trae ninguno: no
+    /// existe una API multiplataforma de selección de color, y montarla exigiría código
+    /// específico en las cuatro plataformas para algo marginal en esta aplicación.
+    /// </remarks>
+    [ObservableProperty]
+    public partial bool IsCustomColorOpen { get; set; }
+
+    [RelayCommand]
+    private void ToggleCustomColor() => IsCustomColorOpen = !IsCustomColorOpen;
+
+    public double ColorR
+    {
+        get => Componente(0);
+        set => FijarComponente(0, value);
+    }
+
+    public double ColorG
+    {
+        get => Componente(1);
+        set => FijarComponente(1, value);
+    }
+
+    public double ColorB
+    {
+        get => Componente(2);
+        set => FijarComponente(2, value);
+    }
+
+    public Color SelectedColorPreview =>
+        Color.TryParse(SelectedColorHex, out var c) ? c : Colors.Black;
+
+    private double Componente(int indice)
+    {
+        var hex = SelectedColorHex.TrimStart('#');
+        if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture, out var valor))
+        {
+            return 0;
+        }
+
+        return indice switch
+        {
+            0 => (valor >> 16) & 0xFF,
+            1 => (valor >> 8) & 0xFF,
+            _ => valor & 0xFF,
+        };
+    }
+
+    private void FijarComponente(int indice, double valor)
+    {
+        var v = (int)Math.Clamp(Math.Round(valor), 0, 255);
+        var r = indice == 0 ? v : (int)Componente(0);
+        var g = indice == 1 ? v : (int)Componente(1);
+        var b = indice == 2 ? v : (int)Componente(2);
+
+        SelectedColorHex = $"#{r:X2}{g:X2}{b:X2}";
+    }
+
+    private void NotificarColor()
+    {
+        OnPropertyChanged(nameof(ColorR));
+        OnPropertyChanged(nameof(ColorG));
+        OnPropertyChanged(nameof(ColorB));
+        OnPropertyChanged(nameof(SelectedColorPreview));
+
+        foreach (var swatch in ColorSwatches)
+            swatch.IsSelected = string.Equals(swatch.Hex, SelectedColorHex, StringComparison.OrdinalIgnoreCase);
     }
 
     partial void OnSelectedChanged(ElementViewModel? value)
@@ -350,8 +492,16 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedKindLabel));
         OnPropertyChanged(nameof(SelectedPageLabel));
         OnPropertyChanged(nameof(SelectedText));
+        OnPropertyChanged(nameof(SelectedTextSummary));
+        OnPropertyChanged(nameof(SelectedTextDetail));
         OnPropertyChanged(nameof(SelectedFontSizePt));
         OnPropertyChanged(nameof(SelectedColorHex));
+
+        // Cambiar de elemento cierra el editor y el panel de color a medida: dejarlos
+        // abiertos daría la impresión de estar editando lo anterior.
+        IsEditingText = false;
+        IsCustomColorOpen = false;
+        NotificarColor();
     }
 
     // ------------------------------------------------------------- favoritas
