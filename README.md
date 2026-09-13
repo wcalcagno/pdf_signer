@@ -9,6 +9,13 @@ contenido real del PDF**.
 
 Una sola base de código en .NET MAUI para Windows, macOS, iOS y Android.
 
+## Descargar
+
+**[⬇️ Instaladores para Windows, Android y macOS](download/README.md)**
+
+Cada plataforma tiene sus particularidades al instalar software sin firmar; están
+explicadas ahí. Para iOS no hay descarga posible, y el motivo también está explicado.
+
 ## Qué es y qué no es
 
 Esto es **firma visual**: el equivalente digital de estampar tu firma sobre el papel.

@@ -130,16 +130,15 @@ jobs:
           -p:CreatePackage=false
           -p:EnableCodeSigning=false
           -p:RuntimeIdentifier=maccatalyst-x64
-          -o artefactos/mac
 
       # El .app no queda siempre en la raiz de la carpeta de salida, asi que se busca.
       # ditto conserva los metadatos del bundle mejor que zip.
       - name: Comprimir el .app
         run: |
-          app=$(find artefactos/mac -maxdepth 3 -name '*.app' -type d | head -1)
+          app=$(find src/PdfSigner.App/bin/Release/net10.0-maccatalyst -maxdepth 3 -name '*.app' -type d | head -1)
           if [ -z "$app" ]; then
             echo "No se encontro ningun .app. Contenido generado:"
-            find artefactos/mac -maxdepth 3 | head -40
+            find src/PdfSigner.App/bin/Release/net10.0-maccatalyst -maxdepth 3 | head -40
             exit 1
           fi
           echo "Empaquetando $app"
@@ -157,6 +156,11 @@ jobs:
   ios:
     name: iOS (solo compilación)
     runs-on: macos-latest
+    # No bloquea el workflow. El runner no trae ningun runtime de simulador compatible con
+    # el SDK del Xcode que exige .NET para iOS 26.0, y actool falla por eso incluso
+    # compilando para dispositivo. Es una limitacion del entorno, no del codigo: el mismo
+    # rasterizador de CoreGraphics compila sin problemas en el trabajo de macCatalyst.
+    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v7
@@ -212,6 +216,13 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           path: paquetes
+
+      # download/README.md promete estas sumas, asi que se generan de verdad.
+      - name: Calcular sumas de verificación
+        run: |
+          cd paquetes
+          find . -type f ! -name 'SHA256SUMS.txt' -exec sha256sum {} \; | sed 's|\./[^/]*/||' > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - uses: softprops/action-gh-release@v2
         with:
