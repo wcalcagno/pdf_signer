@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PdfSigner.Core.Tests", "tests\PdfSigner.Core.Tests\PdfSigner.Core.Tests.csproj", "{76BB5AA2-A42B-4BE0-B976-C0CE7A995945}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PdfSigner.App", "src\PdfSigner.App\PdfSigner.App.csproj", "{6746A5D0-186E-45E7-9E15-34BD14CE0380}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,18 @@ Global
 		{76BB5AA2-A42B-4BE0-B976-C0CE7A995945}.Release|x64.Build.0 = Release|Any CPU
 		{76BB5AA2-A42B-4BE0-B976-C0CE7A995945}.Release|x86.ActiveCfg = Release|Any CPU
 		{76BB5AA2-A42B-4BE0-B976-C0CE7A995945}.Release|x86.Build.0 = Release|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Debug|x64.Build.0 = Debug|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Debug|x86.Build.0 = Debug|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Release|x64.ActiveCfg = Release|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Release|x64.Build.0 = Release|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Release|x86.ActiveCfg = Release|Any CPU
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -52,5 +66,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{F814639B-A0C4-4766-91B9-24326F8D94B1} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{76BB5AA2-A42B-4BE0-B976-C0CE7A995945} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{6746A5D0-186E-45E7-9E15-34BD14CE0380} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

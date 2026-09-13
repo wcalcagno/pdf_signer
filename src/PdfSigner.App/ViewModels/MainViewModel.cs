@@ -1,0 +1,397 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using PdfSigner.App.Services;
+using PdfSigner.Core;
+
+namespace PdfSigner.App.ViewModels;
+
+/// <summary>Estado y acciones de la pantalla principal.</summary>
+/// <remarks>
+/// Toda la lógica de firma vive en PdfSigner.Core; esta clase solo orquesta: elegir archivos,
+/// pedir el rasterizado de la página y entregar el resultado. Es también lo que permite que la
+/// misma interfaz sirva en escritorio y en móvil, porque ninguna decisión depende del gesto
+/// concreto con el que se haya originado.
+/// </remarks>
+public sealed partial class MainViewModel : ObservableObject
+{
+    /// <summary>Ancho al que se rasteriza la página principal. Compromiso entre nitidez y memoria.</summary>
+    private const int MainRenderWidth = 1200;
+
+    private const int ThumbnailWidth = 110;
+
+    private readonly IPdfRasterizer _rasterizer;
+    private readonly IFileExporter _exporter;
+    private readonly FavoriteSignatureStore _favorites;
+    private readonly PdfSignatureService _signer = new();
+
+    private byte[]? _pdfBytes;
+    private string _sourceFileName = "documento.pdf";
+
+    [ObservableProperty]
+    public partial ImageSource? CurrentPageImage { get; set; }
+
+    [ObservableProperty]
+    public partial double CanvasWidth { get; set; }
+
+    [ObservableProperty]
+    public partial double CanvasHeight { get; set; }
+
+    [ObservableProperty]
+    public partial int CurrentPageIndex { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsBusy { get; set; }
+
+    [ObservableProperty]
+    public partial string Status { get; set; }
+
+    [ObservableProperty]
+    public partial double Zoom { get; set; }
+
+    [ObservableProperty]
+    public partial ElementViewModel? Selected { get; set; }
+
+    public MainViewModel(
+        IPdfRasterizer rasterizer, IFileExporter exporter, FavoriteSignatureStore favorites)
+    {
+        _rasterizer = rasterizer;
+        _exporter = exporter;
+        _favorites = favorites;
+
+        // Las partial properties no aceptan inicializador; los valores de partida van aquí.
+        Status = "Abre un PDF para empezar.";
+        Zoom = 1;
+    }
+
+    public ObservableCollection<PageViewModel> Pages { get; } = [];
+
+    /// <summary>Todos los elementos del documento, de todas las páginas.</summary>
+    public ObservableCollection<ElementViewModel> Elements { get; } = [];
+
+    /// <summary>Solo los elementos anclados a la página que se está viendo.</summary>
+    public ObservableCollection<ElementViewModel> VisibleElements { get; } = [];
+
+    public bool HasDocument => _pdfBytes is { Length: > 0 };
+
+    public bool HasFavorite => _favorites.Load() is { IsEmpty: false };
+
+    // ---------------------------------------------------------------- abrir
+
+    [RelayCommand]
+    private async Task OpenPdfAsync()
+    {
+        var file = await FilePicker.Default.PickAsync(new PickOptions
+        {
+            PickerTitle = "Elige un PDF",
+            FileTypes = PdfFileType,
+        });
+
+        if (file is null)
+            return;
+
+        await RunBusyAsync("Abriendo el documento...", async () =>
+        {
+            await using var stream = await file.OpenReadAsync();
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            _pdfBytes = ms.ToArray();
+            _sourceFileName = file.FileName;
+
+            Elements.Clear();
+            VisibleElements.Clear();
+            Pages.Clear();
+
+            using var probe = new MemoryStream(_pdfBytes);
+            var geometry = _signer.Inspect(probe);
+            for (var i = 0; i < geometry.Count; i++)
+                Pages.Add(new PageViewModel(i));
+
+            CurrentPageIndex = 0;
+            await ShowPageAsync(0);
+            OnPropertyChanged(nameof(HasDocument));
+
+            Status = $"{Pages.Count} página(s). Añade una firma o un texto.";
+        });
+
+        // Las miniaturas se generan después de mostrar la página, para que la app responda
+        // enseguida aunque el documento tenga muchas páginas.
+        _ = GenerateThumbnailsAsync();
+    }
+
+    // ------------------------------------------------------------- elementos
+
+    [RelayCommand]
+    private async Task AddImageAsync()
+    {
+        if (!HasDocument)
+            return;
+
+        var file = await FilePicker.Default.PickAsync(new PickOptions
+        {
+            PickerTitle = "Elige la imagen de tu firma",
+            FileTypes = FilePickerFileType.Images,
+        });
+
+        if (file is null)
+            return;
+
+        await using var stream = await file.OpenReadAsync();
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+
+        AddImageElement(ms.ToArray());
+        Status = "Arrastra la firma a su sitio y ajusta el tamaño con la esquina.";
+    }
+
+    [RelayCommand]
+    private void AddText()
+    {
+        if (!HasDocument)
+            return;
+
+        var element = new TextElement
+        {
+            PageIndex = CurrentPageIndex,
+            Bounds = new NormalizedRect(0.12, 0.78, 0.45, 0.10),
+            Text = "Nombre y apellidos\nCargo\nFirmado el {fecha}",
+        };
+
+        Register(new ElementViewModel(element));
+        Status = "Toca el bloque para editarlo. {fecha} se sustituye al exportar.";
+    }
+
+    [RelayCommand]
+    private void DeleteSelected()
+    {
+        if (Selected is null)
+            return;
+
+        Elements.Remove(Selected);
+        VisibleElements.Remove(Selected);
+        Selected = null;
+    }
+
+    public void Select(ElementViewModel? element)
+    {
+        if (Selected is not null)
+            Selected.IsSelected = false;
+
+        Selected = element;
+
+        if (element is not null)
+            element.IsSelected = true;
+    }
+
+    // ------------------------------------------------------------- favoritas
+
+    [RelayCommand]
+    private async Task SaveFavoriteAsync()
+    {
+        var image = Elements.FirstOrDefault(e => e.IsImage && e.PageIndex == CurrentPageIndex);
+        var text = Elements.FirstOrDefault(e => e.IsText && e.PageIndex == CurrentPageIndex)?.AsText;
+
+        if (image is null && text is null)
+        {
+            Status = "No hay nada en esta página que guardar como favorita.";
+            return;
+        }
+
+        var favorite = new FavoriteSignature
+        {
+            Text = text?.Text ?? string.Empty,
+            FontSizePt = text?.FontSizePt ?? 11,
+            ColorHex = text?.ColorHex ?? "#000000",
+            Bold = text?.Bold ?? false,
+        };
+
+        await _favorites.SaveAsync(favorite, image?.ImageData);
+        OnPropertyChanged(nameof(HasFavorite));
+        Status = "Firma favorita guardada en este dispositivo.";
+    }
+
+    [RelayCommand]
+    private async Task ApplyFavoriteAsync()
+    {
+        if (!HasDocument)
+            return;
+
+        var favorite = _favorites.Load();
+        if (favorite is null || favorite.IsEmpty)
+        {
+            Status = "Todavía no has guardado ninguna firma favorita.";
+            return;
+        }
+
+        if (favorite.HasImage && await _favorites.LoadImageAsync() is { Length: > 0 } data)
+            AddImageElement(data);
+
+        if (favorite.HasText)
+        {
+            Register(new ElementViewModel(new TextElement
+            {
+                PageIndex = CurrentPageIndex,
+                Bounds = new NormalizedRect(0.12, 0.78, 0.45, 0.10),
+                Text = favorite.Text,
+                FontSizePt = favorite.FontSizePt,
+                ColorHex = favorite.ColorHex,
+                Bold = favorite.Bold,
+            }));
+        }
+
+        Status = "Firma favorita colocada.";
+    }
+
+    // -------------------------------------------------------------- exportar
+
+    [RelayCommand]
+    private async Task ExportAsync()
+    {
+        if (_pdfBytes is null || Elements.Count == 0)
+        {
+            Status = "Añade al menos una firma antes de exportar.";
+            return;
+        }
+
+        await RunBusyAsync("Generando el PDF firmado...", async () =>
+        {
+            using var input = new MemoryStream(_pdfBytes);
+            using var output = new MemoryStream();
+
+            // El trabajo pesado va a un hilo de fondo: en un PDF grande bloquearía la interfaz.
+            await Task.Run(() =>
+                _signer.Sign(input, output, Elements.Select(e => e.Element)));
+
+            var name = $"{Path.GetFileNameWithoutExtension(_sourceFileName)}-firmado.pdf";
+            var delivered = await _exporter.ExportAsync(name, output.ToArray());
+
+            Status = delivered ? $"Listo: {name}" : "Exportación cancelada.";
+        });
+    }
+
+    // --------------------------------------------------------------- páginas
+
+    [RelayCommand]
+    private async Task GoToPageAsync(PageViewModel page)
+    {
+        if (page.Index == CurrentPageIndex)
+            return;
+
+        CurrentPageIndex = page.Index;
+        await ShowPageAsync(page.Index);
+    }
+
+    private async Task ShowPageAsync(int index)
+    {
+        if (_pdfBytes is null)
+            return;
+
+        using var stream = new MemoryStream(_pdfBytes);
+        var rendered = await _rasterizer.RenderPageAsync(stream, index, MainRenderWidth);
+
+        CurrentPageImage = ImageSource.FromStream(() => new MemoryStream(rendered.PngData));
+        CanvasWidth = rendered.PixelWidth;
+        CanvasHeight = rendered.PixelHeight;
+
+        foreach (var page in Pages)
+            page.IsCurrent = page.Index == index;
+
+        RefreshVisibleElements();
+    }
+
+    private async Task GenerateThumbnailsAsync()
+    {
+        if (_pdfBytes is null)
+            return;
+
+        foreach (var page in Pages.ToList())
+        {
+            try
+            {
+                using var stream = new MemoryStream(_pdfBytes);
+                var rendered = await _rasterizer.RenderPageAsync(stream, page.Index, ThumbnailWidth);
+                page.Thumbnail = ImageSource.FromStream(() => new MemoryStream(rendered.PngData));
+            }
+            catch (Exception)
+            {
+                // Una miniatura que falla no debe impedir trabajar con el documento; la página
+                // sigue siendo accesible por su número.
+            }
+        }
+    }
+
+    // ----------------------------------------------------------------- apoyo
+
+    private void AddImageElement(byte[] data)
+    {
+        var element = new ImageElement
+        {
+            PageIndex = CurrentPageIndex,
+            Bounds = new NormalizedRect(0.12, 0.62, 0.30, 0.10),
+            Data = data,
+        };
+
+        Register(new ElementViewModel(element, data));
+    }
+
+    private void Register(ElementViewModel vm)
+    {
+        vm.SetCanvasSize(CanvasWidth, CanvasHeight);
+        Elements.Add(vm);
+        RefreshVisibleElements();
+        Select(vm);
+    }
+
+    private void RefreshVisibleElements()
+    {
+        VisibleElements.Clear();
+
+        foreach (var element in Elements.Where(e => e.PageIndex == CurrentPageIndex))
+        {
+            element.SetCanvasSize(CanvasWidth, CanvasHeight);
+            VisibleElements.Add(element);
+        }
+    }
+
+    partial void OnCanvasWidthChanged(double value) => PropagateCanvasSize();
+
+    partial void OnCanvasHeightChanged(double value) => PropagateCanvasSize();
+
+    private void PropagateCanvasSize()
+    {
+        foreach (var element in Elements)
+            element.SetCanvasSize(CanvasWidth, CanvasHeight);
+    }
+
+    private async Task RunBusyAsync(string message, Func<Task> work)
+    {
+        IsBusy = true;
+        Status = message;
+
+        try
+        {
+            await work();
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Cada plataforma identifica los PDF de forma distinta, así que hay que enumerarlas todas.
+    /// </summary>
+    private static FilePickerFileType PdfFileType => new(
+        new Dictionary<DevicePlatform, IEnumerable<string>>
+        {
+            [DevicePlatform.WinUI] = [".pdf"],
+            [DevicePlatform.macOS] = ["pdf"],
+            [DevicePlatform.MacCatalyst] = ["pdf"],
+            [DevicePlatform.iOS] = ["com.adobe.pdf"],
+            [DevicePlatform.Android] = ["application/pdf"],
+        });
+}

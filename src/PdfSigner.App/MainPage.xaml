@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:PdfSigner.App.ViewModels"
+             x:Class="PdfSigner.App.MainPage"
+             x:DataType="vm:MainViewModel"
+             Title="PdfSigner">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" RowSpacing="0">
+
+        <!-- Barra de acciones. Va dentro de un ScrollView horizontal para que en pantallas
+             estrechas los botones no se recorten ni se apilen de forma rara. -->
+        <ScrollView Grid.Row="0" Orientation="Horizontal" BackgroundColor="{AppThemeBinding Light=#F2F2F7, Dark=#1C1C1E}">
+            <HorizontalStackLayout Padding="12,10" Spacing="8">
+                <Button Text="Abrir PDF" Command="{Binding OpenPdfCommand}" />
+                <Button Text="Añadir firma" Command="{Binding AddImageCommand}" IsEnabled="{Binding HasDocument}" />
+                <Button Text="Añadir texto" Command="{Binding AddTextCommand}" IsEnabled="{Binding HasDocument}" />
+                <Button Text="Usar favorita" Command="{Binding ApplyFavoriteCommand}" IsEnabled="{Binding HasDocument}" />
+                <Button Text="Guardar favorita" Command="{Binding SaveFavoriteCommand}" IsEnabled="{Binding HasDocument}" />
+                <Button Text="Eliminar" Command="{Binding DeleteSelectedCommand}" />
+                <Button Text="Exportar" Command="{Binding ExportCommand}" IsEnabled="{Binding HasDocument}" />
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <!-- Vista de la página. El ScrollView da desplazamiento en escritorio y móvil; el
+             pellizco actúa sobre la escala del contenedor, no sobre el ScrollView, porque
+             MAUI no trae zoom por pellizco de serie. -->
+        <ScrollView Grid.Row="1" Orientation="Both" BackgroundColor="{AppThemeBinding Light=#8E8E93, Dark=#000000}">
+            <Grid Padding="20" HorizontalOptions="Center" VerticalOptions="Center">
+                <Grid x:Name="PageHost"
+                      WidthRequest="{Binding CanvasWidth}"
+                      HeightRequest="{Binding CanvasHeight}"
+                      AnchorX="0" AnchorY="0"
+                      Scale="{Binding Zoom}">
+
+                    <Image Source="{Binding CurrentPageImage}" Aspect="Fill" />
+
+                    <!-- Capa de elementos colocados sobre la página. -->
+                    <Grid BindableLayout.ItemsSource="{Binding VisibleElements}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ElementViewModel">
+                                <Border Margin="{Binding Position}"
+                                        WidthRequest="{Binding Width}"
+                                        HeightRequest="{Binding Height}"
+                                        HorizontalOptions="Start"
+                                        VerticalOptions="Start"
+                                        BackgroundColor="Transparent"
+                                        Stroke="{Binding OutlineColor}"
+                                        StrokeThickness="{Binding OutlineThickness}">
+
+                                    <Border.GestureRecognizers>
+                                        <PanGestureRecognizer PanUpdated="OnElementPan" />
+                                        <TapGestureRecognizer Tapped="OnElementTapped" />
+                                    </Border.GestureRecognizers>
+
+                                    <Grid>
+                                        <Image Source="{Binding Preview}"
+                                               Aspect="Fill"
+                                               IsVisible="{Binding IsImage}" />
+
+                                        <Label Text="{Binding DisplayText}"
+                                               FontSize="{Binding FontSize}"
+                                               TextColor="{Binding TextColor}"
+                                               IsVisible="{Binding IsText}"
+                                               LineBreakMode="WordWrap" />
+
+                                        <!-- Tirador de redimensionado. Un asa explícita funciona
+                                             igual con ratón y con dedo; el pellizco sobre el
+                                             elemento chocaría con el zoom de la página. -->
+                                        <BoxView WidthRequest="22" HeightRequest="22"
+                                                 CornerRadius="11"
+                                                 Color="DodgerBlue"
+                                                 HorizontalOptions="End" VerticalOptions="End"
+                                                 Margin="0,0,-11,-11"
+                                                 IsVisible="{Binding IsSelected}">
+                                            <BoxView.GestureRecognizers>
+                                                <PanGestureRecognizer PanUpdated="OnHandlePan" />
+                                            </BoxView.GestureRecognizers>
+                                        </BoxView>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </Grid>
+
+                    <Grid.GestureRecognizers>
+                        <PinchGestureRecognizer PinchUpdated="OnPagePinch" />
+                    </Grid.GestureRecognizers>
+                </Grid>
+            </Grid>
+        </ScrollView>
+
+        <!-- Editor del bloque de texto seleccionado. -->
+        <VerticalStackLayout Grid.Row="2" Padding="12,8" Spacing="6"
+                             BackgroundColor="{AppThemeBinding Light=#F2F2F7, Dark=#1C1C1E}"
+                             IsVisible="{Binding Selected.IsText, FallbackValue=False}">
+            <Editor Text="{Binding Selected.Text, Mode=TwoWay}"
+                    Placeholder="Nombre, cargo, {fecha}..."
+                    AutoSize="TextChanges"
+                    MaxLength="500" />
+            <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                <Label Text="Tamaño" VerticalOptions="Center" />
+                <Stepper Minimum="6" Maximum="48" Increment="1"
+                         Value="{Binding Selected.FontSizePt, Mode=TwoWay}" />
+                <Label Text="{Binding Selected.FontSizePt, StringFormat='{0:F0} pt'}" VerticalOptions="Center" />
+                <Entry Text="{Binding Selected.ColorHex, Mode=TwoWay}"
+                       Placeholder="#000000" WidthRequest="100" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+
+        <!-- Tira de miniaturas. -->
+        <CollectionView Grid.Row="3"
+                        ItemsSource="{Binding Pages}"
+                        HeightRequest="120"
+                        IsVisible="{Binding HasDocument}"
+                        BackgroundColor="{AppThemeBinding Light=#E5E5EA, Dark=#2C2C2E}">
+            <CollectionView.ItemsLayout>
+                <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:PageViewModel">
+                    <VerticalStackLayout Padding="8,6" Spacing="2">
+                        <VerticalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnPageTapped" />
+                        </VerticalStackLayout.GestureRecognizers>
+                        <Image Source="{Binding Thumbnail}" HeightRequest="80" Aspect="AspectFit" />
+                        <Label Text="{Binding Label}" HorizontalOptions="Center" FontSize="12" />
+                    </VerticalStackLayout>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Estado. -->
+        <Grid Grid.Row="4" Padding="12,8" ColumnDefinitions="*,Auto"
+              BackgroundColor="{AppThemeBinding Light=#F2F2F7, Dark=#1C1C1E}">
+            <Label Text="{Binding Status}" FontSize="13" VerticalOptions="Center" />
+            <ActivityIndicator Grid.Column="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        </Grid>
+    </Grid>
+</ContentPage>
