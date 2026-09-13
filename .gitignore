@@ -42,3 +42,8 @@ TestResults/
 *.trx
 *.coverage
 coverage*.xml
+
+# Instaladores generados
+dist/
+artefactos/
+*.wixpdb

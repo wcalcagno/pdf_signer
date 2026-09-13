@@ -1,0 +1,157 @@
+name: Paquetes
+
+# Se puede lanzar a mano para comprobar que las cuatro plataformas siguen compilando,
+# o automáticamente al publicar una etiqueta v*, que además adjunta los paquetes a la
+# Release de GitHub.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+
+  # --------------------------------------------------------------- Windows
+  windows:
+    name: Windows (MSI)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Instalar workloads de MAUI
+        run: dotnet workload install maui --skip-manifest-update
+
+      - name: Instalar WiX
+        run: |
+          dotnet tool install --global wix --version 6.0.2
+          wix extension add --global WixToolset.UI.wixext/6.0.2
+
+      - name: Construir el MSI
+        run: .\installer\build-msi.ps1 -Version 1.0.0 -Arch x64
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: dist/*.msi
+
+  # --------------------------------------------------------------- Android
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '17'
+
+      - name: Instalar workloads de MAUI
+        run: dotnet workload install maui-android --skip-manifest-update
+
+      # AndroidKeyStore=false firma con la clave de depuración. Es suficiente para
+      # instalar el APK a mano, que es como se distribuye fuera de Play Store. Subir a
+      # Play exige una clave propia, que iría en los secretos del repositorio.
+      - name: Publicar APK
+        run: >
+          dotnet publish src/PdfSigner.App/PdfSigner.App.csproj
+          -f net10.0-android -c Release
+          -p:AndroidPackageFormat=apk
+          -p:AndroidKeyStore=false
+          -o artefactos/android
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: artefactos/android/*.apk
+
+  # ------------------------------------------------------------ macCatalyst
+  mac:
+    name: macOS (app)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Instalar workloads de MAUI
+        run: dotnet workload install maui --skip-manifest-update
+
+      # Sin certificado de Apple no se puede firmar ni notarizar, así que se genera el
+      # .app sin firmar. macOS lo bloqueará la primera vez: hay que abrirlo con clic
+      # derecho > Abrir, o quitar la cuarentena con xattr. Viene explicado en el README.
+      - name: Publicar la app de macCatalyst
+        run: >
+          dotnet publish src/PdfSigner.App/PdfSigner.App.csproj
+          -f net10.0-maccatalyst -c Release
+          -p:CreatePackage=false
+          -p:EnableCodeSigning=false
+          -p:RuntimeIdentifier=maccatalyst-x64
+          -o artefactos/mac
+
+      - name: Comprimir el .app
+        run: |
+          cd artefactos/mac
+          zip -r -y ../../PdfSigner-macos.zip *.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: PdfSigner-macos.zip
+
+  # ------------------------------------------------------------------- iOS
+  # Solo se compila para comprobar que el código sigue siendo válido. No se genera IPA:
+  # distribuir en iOS exige una cuenta de desarrollador de Apple de pago y perfiles de
+  # aprovisionamiento, que no se pueden meter en un repositorio público.
+  ios:
+    name: iOS (solo compilación)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Instalar workloads de MAUI
+        run: dotnet workload install maui --skip-manifest-update
+
+      - name: Compilar para el simulador
+        run: >
+          dotnet build src/PdfSigner.App/PdfSigner.App.csproj
+          -f net10.0-ios -c Release
+          -p:RuntimeIdentifier=iossimulator-x64
+
+  # --------------------------------------------------------------- Release
+  publicar:
+    name: Adjuntar a la Release
+    needs: [windows, android, mac]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: paquetes
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: paquetes/**/*
+          generate_release_notes: true
