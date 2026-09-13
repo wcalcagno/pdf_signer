@@ -21,7 +21,9 @@ public sealed class AndroidPdfRasterizer : IPdfRasterizer
         ArgumentNullException.ThrowIfNull(pdf);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetWidthPx);
 
-        var tempPath = Path.Combine(FileSystem.CacheDirectory, $"render-{Guid.NewGuid():N}.pdf");
+        // Path y Color van cualificados: Android.Graphics define los suyos y chocan con
+        // System.IO.Path y Microsoft.Maui.Graphics.Color.
+        var tempPath = System.IO.Path.Combine(FileSystem.CacheDirectory, $"render-{Guid.NewGuid():N}.pdf");
 
         try
         {
@@ -53,7 +55,7 @@ public sealed class AndroidPdfRasterizer : IPdfRasterizer
 
             // PdfRenderer dibuja sobre fondo transparente. Sin pintarlo de blanco antes, una
             // página normal se vería como un rectángulo transparente sobre el fondo de la app.
-            bitmap.EraseColor(Color.White.ToArgb());
+            bitmap.EraseColor(Android.Graphics.Color.White.ToArgb());
             page.Render(bitmap, null, null, PdfRenderMode.ForDisplay);
 
             using var ms = new MemoryStream();

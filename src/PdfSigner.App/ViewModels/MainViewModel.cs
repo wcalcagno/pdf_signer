@@ -183,6 +183,63 @@ public sealed partial class MainViewModel : ObservableObject
             element.IsSelected = true;
     }
 
+    // ---- Vista plana del elemento seleccionado ----
+    //
+    // La interfaz no enlaza contra "Selected.Texto" sino contra estas propiedades. El motivo
+    // es técnico: Selected es nullable, así que en un enlace compilado "Selected.IsText" tiene
+    // tipo bool? y el generador de XAML de MAUI no sabe convertirlo, fallando la compilación
+    // en Android con errores dentro de código generado, que son costosos de rastrear.
+    // Aplanarlo aquí deja además el XAML más legible.
+
+    public bool SelectedIsText => Selected?.IsText == true;
+
+    public string SelectedText
+    {
+        get => Selected?.Text ?? string.Empty;
+        set
+        {
+            if (Selected is not { IsText: true } s || s.Text == value)
+                return;
+
+            s.Text = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public double SelectedFontSizePt
+    {
+        get => Selected?.FontSizePt ?? 11;
+        set
+        {
+            if (Selected is not { IsText: true } s || Math.Abs(s.FontSizePt - value) < 0.01)
+                return;
+
+            s.FontSizePt = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string SelectedColorHex
+    {
+        get => Selected?.ColorHex ?? "#000000";
+        set
+        {
+            if (Selected is not { IsText: true } s || s.ColorHex == value)
+                return;
+
+            s.ColorHex = value;
+            OnPropertyChanged();
+        }
+    }
+
+    partial void OnSelectedChanged(ElementViewModel? value)
+    {
+        OnPropertyChanged(nameof(SelectedIsText));
+        OnPropertyChanged(nameof(SelectedText));
+        OnPropertyChanged(nameof(SelectedFontSizePt));
+        OnPropertyChanged(nameof(SelectedColorHex));
+    }
+
     // ------------------------------------------------------------- favoritas
 
     [RelayCommand]

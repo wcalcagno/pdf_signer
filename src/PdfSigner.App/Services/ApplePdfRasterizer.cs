@@ -33,7 +33,7 @@ public sealed class ApplePdfRasterizer : IPdfRasterizer
 
         using var data = NSData.FromArray(buffer.ToArray());
         using var provider = new CGDataProvider(data);
-        using var document = CGPDFDocument.FromProvider(provider)
+        using var document = new CGPDFDocument(provider)
             ?? throw new InvalidOperationException("El archivo no se pudo leer como PDF.");
 
         if (pageIndex < 0 || pageIndex >= document.Pages)
