@@ -18,6 +18,55 @@ public partial class MainPage : ContentPage
     {
         InitializeComponent();
         BindingContext = _vm = vm;
+
+        if (DeviceInfo.Current.Idiom != DeviceIdiom.Desktop)
+            AplicarDisposicionMovil();
+    }
+
+    /// <summary>
+    /// Reorganiza las cuatro regiones para pantallas de móvil: el inspector deja de ser una
+    /// columna lateral y pasa a ser un panel inferior.
+    /// </summary>
+    /// <remarks>
+    /// Se hace en código y no con OnIdiom en el XAML por una razón práctica: OnIdiom sobre
+    /// propiedades que requieren conversor de tipo, como RowDefinitions, es terreno poco
+    /// fiable, y en esta máquina no hay forma de comprobarlo porque solo se puede ejecutar
+    /// Windows. Un método explícito se puede revisar leyéndolo, sin depender de un emulador.
+    ///
+    /// No es lógica de negocio sino colocación de vistas, así que la vista es su sitio.
+    ///
+    /// PENDIENTE: nadie ha ejecutado esto todavía en un teléfono. Está escrito contra la
+    /// API documentada, igual que el resto del código específico de móvil.
+    /// </remarks>
+    private void AplicarDisposicionMovil()
+    {
+        // Una sola columna: el canvas ocupa todo el ancho.
+        RaizGrid.ColumnDefinitions = [new ColumnDefinition(GridLength.Star)];
+
+        // Cuatro filas: barra, canvas, inspector y navegador.
+        RaizGrid.RowDefinitions =
+        [
+            new RowDefinition(GridLength.Auto),
+            new RowDefinition(GridLength.Star),
+            new RowDefinition(GridLength.Auto),
+            new RowDefinition(GridLength.Auto),
+        ];
+
+        Grid.SetColumnSpan(BarraSuperior, 1);
+
+        // El inspector baja a su propia fila, a lo ancho, con altura fija: la fase 4 anima
+        // su aparición con TranslationY, que sí es interpolable (una fila Auto no lo es).
+        Grid.SetRow(Inspector, 2);
+        Grid.SetColumn(Inspector, 0);
+        // La medida se lee del diccionario de estilos para no tenerla escrita en dos sitios.
+        if (Application.Current?.Resources.TryGetValue("AltoBottomSheet", out var alto) == true
+            && alto is double altoSheet)
+        {
+            Inspector.HeightRequest = altoSheet;
+        }
+
+        Grid.SetRow(RegionNavegador, 3);
+        Grid.SetColumnSpan(RegionNavegador, 1);
     }
 
     private void OnElementTapped(object? sender, TappedEventArgs e)

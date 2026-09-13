@@ -110,6 +110,7 @@ public sealed partial class MainViewModel : ObservableObject
             CurrentPageIndex = 0;
             await ShowPageAsync(0);
             OnPropertyChanged(nameof(HasDocument));
+            OnPropertyChanged(nameof(HasNoDocument));
 
             Status = $"{Pages.Count} página(s). Añade una firma o un texto.";
         });
@@ -191,7 +192,46 @@ public sealed partial class MainViewModel : ObservableObject
     // en Android con errores dentro de código generado, que son costosos de rastrear.
     // Aplanarlo aquí deja además el XAML más legible.
 
+    /// <summary>Hay un elemento seleccionado. Gobierna el inspector y la barra contextual.</summary>
+    public bool HasSelection => Selected is not null;
+
+    /// <summary>
+    /// Negación de <see cref="HasSelection"/>, para el estado vacío del inspector.
+    /// </summary>
+    /// <remarks>
+    /// Se expone como propiedad en lugar de registrar un convertidor de booleano invertido:
+    /// MAUI no trae ninguno de serie y añadir uno solo para esto no compensa.
+    /// </remarks>
+    public bool HasNoSelection => Selected is null;
+
+    public bool HasNoDocument => !HasDocument;
+
+    /// <summary>Si el inspector debe verse ahora mismo.</summary>
+    /// <remarks>
+    /// El idioma del dispositivo se resuelve aquí y no con OnIdiom en el XAML porque OnIdiom
+    /// produce un VALOR en tiempo de análisis: anidarle un Binding compila, pero el enlace
+    /// nunca llega a evaluarse y la propiedad se queda con el objeto Binding. Es un fallo
+    /// silencioso, de los que no dan error y solo se notan probando la aplicación.
+    ///
+    /// En escritorio el inspector está siempre presente, con su estado vacío, para que el
+    /// canvas no cambie de ancho al seleccionar. En móvil solo aparece si hay selección.
+    /// </remarks>
+    public bool InspectorVisible =>
+        DeviceInfo.Current.Idiom == DeviceIdiom.Desktop || HasSelection;
+
     public bool SelectedIsText => Selected?.IsText == true;
+
+    public bool SelectedIsImage => Selected?.IsImage == true;
+
+    public string SelectedKindLabel => Selected switch
+    {
+        { IsText: true } => "Bloque de texto",
+        { IsImage: true } => "Imagen de firma",
+        _ => string.Empty,
+    };
+
+    public string SelectedPageLabel =>
+        Selected is null ? string.Empty : $"En la página {Selected.PageIndex + 1}";
 
     public string SelectedText
     {
@@ -234,7 +274,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnSelectedChanged(ElementViewModel? value)
     {
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(HasNoSelection));
+        OnPropertyChanged(nameof(InspectorVisible));
         OnPropertyChanged(nameof(SelectedIsText));
+        OnPropertyChanged(nameof(SelectedIsImage));
+        OnPropertyChanged(nameof(SelectedKindLabel));
+        OnPropertyChanged(nameof(SelectedPageLabel));
         OnPropertyChanged(nameof(SelectedText));
         OnPropertyChanged(nameof(SelectedFontSizePt));
         OnPropertyChanged(nameof(SelectedColorHex));

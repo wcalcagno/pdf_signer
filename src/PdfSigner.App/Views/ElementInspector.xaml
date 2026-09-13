@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Inspector de propiedades del elemento seleccionado.
+
+    Es UNA sola vista para las dos disposiciones: en escritorio la coloca MainPage como
+    columna fija a la derecha, y en móvil como panel inferior. La vista no sabe cuál de las
+    dos es, y esa es justamente la idea: la diferencia es dónde se coloca, no qué muestra.
+
+    Hereda el BindingContext de MainPage, o sea el MainViewModel.
+-->
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:PdfSigner.App.ViewModels"
+             x:Class="PdfSigner.App.Views.ElementInspector"
+             x:DataType="vm:MainViewModel">
+
+    <Border Style="{StaticResource RegionInspector}">
+        <Grid RowDefinitions="Auto,*">
+
+            <Label Grid.Row="0"
+                   Text="PROPIEDADES"
+                   Style="{StaticResource EtiquetaSeccion}"
+                   Margin="0,0,0,10" />
+
+            <!-- Estado vacío. En escritorio el inspector no se oculta nunca: mostrar un
+                 mensaje es preferible a dejar un hueco gris, y evita que el canvas cambie
+                 de ancho al seleccionar, que es justo lo que hacía mal la versión anterior. -->
+            <VerticalStackLayout Grid.Row="1"
+                                 VerticalOptions="Center"
+                                 Spacing="6"
+                                 IsVisible="{Binding HasNoSelection}">
+                <Label Text="Selecciona un elemento"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource TextoTenue}"
+                       FontSize="13" />
+                <Label Text="Toca una firma o un bloque de texto sobre la página para ver sus propiedades."
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center"
+                       TextColor="{StaticResource TextoTenue}"
+                       FontSize="11" />
+            </VerticalStackLayout>
+
+            <!-- Propiedades del elemento seleccionado. -->
+            <ScrollView Grid.Row="1" IsVisible="{Binding HasSelection}">
+                <VerticalStackLayout Spacing="12">
+
+                    <Label Text="{Binding SelectedKindLabel}"
+                           FontSize="13"
+                           FontAttributes="Bold" />
+
+                    <!-- Bloque de texto. -->
+                    <VerticalStackLayout Spacing="8" IsVisible="{Binding SelectedIsText}">
+
+                        <Editor Text="{Binding SelectedText, Mode=TwoWay}"
+                                Placeholder="Nombre, cargo, {fecha}..."
+                                AutoSize="TextChanges"
+                                MinimumHeightRequest="90"
+                                MaxLength="500" />
+
+                        <Label Text="Tamaño" Style="{StaticResource EtiquetaSeccion}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Stepper Grid.Column="0"
+                                     Minimum="6" Maximum="48" Increment="1"
+                                     Value="{Binding SelectedFontSizePt, Mode=TwoWay}"
+                                     HorizontalOptions="Start" />
+                            <Label Grid.Column="1"
+                                   Text="{Binding SelectedFontSizePt, StringFormat='{0:F0} pt'}"
+                                   VerticalOptions="Center"
+                                   FontSize="13" />
+                        </Grid>
+
+                        <!-- Fase 4 sustituye este campo por una paleta de muestras. -->
+                        <Label Text="Color" Style="{StaticResource EtiquetaSeccion}" />
+                        <Entry Text="{Binding SelectedColorHex, Mode=TwoWay}"
+                               Placeholder="#000000" />
+                    </VerticalStackLayout>
+
+                    <!-- Imagen de firma. -->
+                    <VerticalStackLayout Spacing="6" IsVisible="{Binding SelectedIsImage}">
+                        <Label Text="Arrastra la imagen para moverla y usa las esquinas para cambiar su tamaño."
+                               FontSize="11"
+                               TextColor="{StaticResource TextoTenue}" />
+                    </VerticalStackLayout>
+
+                    <Label Text="{Binding SelectedPageLabel}"
+                           FontSize="11"
+                           TextColor="{StaticResource TextoTenue}" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </Grid>
+    </Border>
+</ContentView>

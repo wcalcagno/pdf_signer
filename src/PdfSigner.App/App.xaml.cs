@@ -15,5 +15,21 @@ public partial class App : Application
     // Se prescinde de Shell a propósito: la aplicación tiene una sola pantalla, y Shell obliga
     // a construir la página por plantilla, lo que complica pasarle el ViewModel por inyección.
     protected override Window CreateWindow(IActivationState? activationState)
-        => new(_services.GetRequiredService<MainPage>());
+    {
+        var window = new Window(_services.GetRequiredService<MainPage>());
+
+        // En escritorio MAUI abre una ventana desmesurada, que en pantallas de portátil se
+        // sale de los bordes y deja el inspector y el navegador de páginas fuera de vista.
+        // Se fija un tamaño de partida razonable y un mínimo por debajo del cual la
+        // disposición de cuatro regiones deja de tener sentido.
+        if (DeviceInfo.Current.Idiom == DeviceIdiom.Desktop)
+        {
+            window.Width = 1280;
+            window.Height = 860;
+            window.MinimumWidth = 900;
+            window.MinimumHeight = 600;
+        }
+
+        return window;
+    }
 }
