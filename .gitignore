@@ -1,0 +1,44 @@
+# ---- Build .NET ----
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userprefs
+*.binlog
+
+# ---- IDEs ----
+.vs/
+.vscode/
+.idea/
+*.swp
+
+# ---- MAUI / por plataforma ----
+# Android
+*.keystore
+!debug.keystore
+local.properties
+src/PdfSigner.App/Platforms/Android/Resources/resource.designer.cs
+
+# iOS / macOS
+*.ipa
+*.dSYM/
+xcuserdata/
+.DS_Store
+
+# Windows
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+AppPackages/
+BundleArtifacts/
+src/PdfSigner.App/Platforms/Windows/*.pfx
+
+# ---- Salidas de prueba ----
+TestResults/
+*.trx
+*.coverage
+coverage*.xml

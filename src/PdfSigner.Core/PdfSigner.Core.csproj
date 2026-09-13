@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- Este proyecto NO referencia MAUI a proposito: asi los tests corren en CI
+         sin emuladores ni Mac, que es donde vive la logica que realmente importa. -->
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ParseColor es un detalle interno, pero conviene tenerlo cubierto por tests. -->
+    <InternalsVisibleTo Include="PdfSigner.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Las fuentes van embebidas en el ensamblado. En iOS/Android no hay acceso
+         a las fuentes del sistema, y embeberlas ademas nos saca del riesgo de que
+         el trimmer de iOS pode la resolucion de fuentes por reflexion. -->
+    <EmbeddedResource Include="Fonts\*.ttf" />
+  </ItemGroup>
+
+</Project>

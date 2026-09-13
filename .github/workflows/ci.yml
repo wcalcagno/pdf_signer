@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  core:
+    name: Core y tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Se compilan los proyectos por separado y no la solucion completa: la app MAUI
+      # necesita los workloads (~1 GB) y un runner por plataforma, mientras que el core
+      # es .NET puro y corre aqui en segundos. Esa separacion es justamente el motivo
+      # de que la logica de firma no dependa de MAUI.
+      - name: Restaurar
+        run: dotnet restore src/PdfSigner.Core/PdfSigner.Core.csproj tests/PdfSigner.Core.Tests/PdfSigner.Core.Tests.csproj
+
+      - name: Compilar
+        run: dotnet build tests/PdfSigner.Core.Tests/PdfSigner.Core.Tests.csproj --configuration Release --no-restore
+
+      - name: Tests
+        run: dotnet test tests/PdfSigner.Core.Tests/PdfSigner.Core.Tests.csproj --configuration Release --no-build --verbosity normal
