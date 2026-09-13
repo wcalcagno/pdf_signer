@@ -23,8 +23,30 @@ public sealed class PdfSignatureService
     /// <summary>Lee la geometría de cada página sin modificar el documento.</summary>
     public IReadOnlyList<PageGeometry> Inspect(Stream pdf)
     {
-        using var doc = PdfReader.Open(AsSeekable(pdf), PdfDocumentOpenMode.Import);
+        using var doc = Abrir(pdf, PdfDocumentOpenMode.Import);
         return [.. doc.Pages.Cast<PdfPage>().Select(PageGeometry.FromPage)];
+    }
+
+    /// <summary>Abre el documento traduciendo los fallos a mensajes que el usuario entienda.</summary>
+    private static PdfDocument Abrir(Stream pdf, PdfDocumentOpenMode modo)
+    {
+        try
+        {
+            return PdfReader.Open(AsSeekable(pdf), modo);
+        }
+        catch (PdfReaderException ex) when (ex.Message.Contains("password", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new PdfSignerException(
+                "El PDF está protegido con contraseña. Quítale la protección antes de firmarlo.", ex);
+        }
+        catch (Exception ex) when (ex is not PdfSignerException)
+        {
+            // Se agrupa todo lo demás a propósito: PDFsharp lanza desde ArgumentOutOfRangeException
+            // hasta InvalidOperationException según por dónde se rompa el archivo, y para quien
+            // firma un contrato la causa concreta es irrelevante.
+            throw new PdfSignerException(
+                "No se pudo leer el archivo: no parece un PDF válido o está dañado.", ex);
+        }
     }
 
     /// <summary>
@@ -47,7 +69,7 @@ public sealed class PdfSignatureService
         ArgumentNullException.ThrowIfNull(elements);
 
         var timestamp = now ?? DateTime.Now;
-        using var doc = PdfReader.Open(AsSeekable(input), PdfDocumentOpenMode.Modify);
+        using var doc = Abrir(input, PdfDocumentOpenMode.Modify);
 
         // Una misma imagen usada en varias páginas debe embeberse UNA sola vez: sin esta caché
         // firmar 20 páginas multiplicaría por 20 el peso del archivo.
@@ -114,7 +136,17 @@ public sealed class PdfSignatureService
             // hasta que el documento se guarde; por eso se cierra al final y no aquí.
             var ms = new MemoryStream(element.Data, writable: false);
             openStreams.Add(ms);
-            image = XImage.FromStream(ms);
+
+            try
+            {
+                image = XImage.FromStream(ms);
+            }
+            catch (Exception ex)
+            {
+                throw new PdfSignerException(
+                    "La imagen no tiene un formato admitido. Usa un archivo PNG o JPG.", ex);
+            }
+
             cache[element.Data] = image;
         }
 

@@ -87,6 +87,14 @@ internal sealed partial class PdfContentInspector
 
     public bool ContainsText(string fragment) => _raw.Contains(fragment, StringComparison.Ordinal);
 
+    /// <summary>Desplazamientos "Td" del texto, para comparar cómo se reparten las líneas.</summary>
+    public IReadOnlyList<(double X, double Y)> TextPositions =>
+    [
+        .. TextOffset().Matches(_raw).Select(m => (
+            double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
+            double.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture)))
+    ];
+
     /// <summary>Matrices de transformación de imagen: "a b c d e f cm" seguido de "/Ix Do".</summary>
     public IReadOnlyList<double[]> ImageMatrices => [.. ImageMatrix().Matches(_raw).Select(Parse)];
 
@@ -114,6 +122,9 @@ internal sealed partial class PdfContentInspector
 
     [GeneratedRegex(@"/FontFile\d?")]
     private static partial Regex FontFile();
+
+    [GeneratedRegex(@"(-?[\d.]+) (-?[\d.]+) Td")]
+    private static partial Regex TextOffset();
 
     [GeneratedRegex(@"(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) cm\s*/I\d+ Do")]
     private static partial Regex ImageMatrix();
