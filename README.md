@@ -56,16 +56,20 @@ entre plataformas y este proyecto se ha desarrollado en una máquina Windows:
 
 | Plataforma | Estado | Detalle |
 |---|---|---|
-| **Windows** | ✅ Verificado | Compila sin advertencias, arranca, rasteriza páginas y produce PDFs correctos, incluso en páginas con `/Rotate`. Los diálogos de abrir y guardar no se han probado de forma automatizada. |
-| **Android** | ⚠️ Sin compilar | Código escrito contra la API documentada de `PdfRenderer`. No se ha compilado por no tener el SDK de Android instalado. Espero pocos problemas, pero no lo he comprobado. |
-| **iOS** | ⚠️ Sin compilar | Requiere un Mac con Xcode, del que no dispongo. El rasterizador usa CoreGraphics, que es API estable, pero **nadie lo ha ejecutado todavía**. |
-| **macCatalyst** | ⚠️ Sin compilar | Mismo caso que iOS; comparte el mismo rasterizador. |
+| **Windows** | ✅ Probado | Compila sin advertencias, arranca, rasteriza páginas y produce PDFs correctos incluso con `/Rotate`. El MSI se ha instalado, ejecutado y desinstalado sin dejar restos. |
+| **Android** | 🟡 Compila | Se genera el APK en CI, pero **nadie lo ha ejecutado en un dispositivo**. |
+| **macOS** | 🟡 Compila | Se genera el `.app` en CI, pero **nadie lo ha ejecutado**. |
+| **iOS** | ⚠️ Sin compilar | No por el código: el runner de CI no tiene ningún runtime de simulador compatible con el Xcode que exige .NET para iOS 26, y `actool` falla antes de terminar. El mismo rasterizador de CoreGraphics **sí compila** en el trabajo de macOS, que comparte ese archivo. |
 
-**Si pruebas en alguna de las plataformas no verificadas, un issue contando qué pasó es
-la contribución más valiosa que puedes hacer ahora mismo.**
+Que algo compile no significa que funcione. En Android y macOS está verificado que el
+código es válido y que se empaqueta, nada más: la interacción real —abrir un PDF, arrastrar
+la firma, exportar— no la ha probado nadie todavía.
 
-El núcleo de firma (`PdfSigner.Core`) sí está cubierto por 42 tests que corren en CI, y es
-donde vive toda la lógica que puede producir un PDF incorrecto.
+**Si lo pruebas en alguna de esas plataformas, un issue contando qué pasó es la
+contribución más valiosa que puedes hacer ahora mismo.**
+
+El núcleo de firma (`PdfSigner.Core`) está cubierto por **155 pruebas** que corren en CI sin
+emulador ni Mac, y es donde vive toda la lógica que puede producir un PDF incorrecto.
 
 ## Arquitectura
 
@@ -74,7 +78,7 @@ Tres proyectos, con una separación que no es decorativa:
 ```
 src/PdfSigner.Core/    Lógica de firma. .NET puro, sin MAUI.
 src/PdfSigner.App/     Interfaz MAUI y código específico de cada plataforma.
-tests/PdfSigner.Core.Tests/   42 tests, corren en CI sin emulador ni Mac.
+tests/PdfSigner.Core.Tests/   155 pruebas, corren en CI sin emulador ni Mac.
 ```
 
 `PdfSigner.Core` **no referencia MAUI**. Gracias a eso, la parte que de verdad puede
