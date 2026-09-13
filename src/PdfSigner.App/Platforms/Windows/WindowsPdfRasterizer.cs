@@ -26,7 +26,15 @@ public sealed class WindowsPdfRasterizer : IPdfRasterizer
         using var input = new InMemoryRandomAccessStream();
         if (pdf.CanSeek)
             pdf.Position = 0;
-        await pdf.CopyToAsync(input.AsStreamForWrite(), ct).ConfigureAwait(false);
+
+        // El adaptador que devuelve AsStreamForWrite escribe en un búfer propio y NO vuelca
+        // al IRandomAccessStream hasta que se le hace flush. Sin esta llamada, PdfDocument
+        // recibe un flujo vacío y falla con 0x8004808E ("Invalid file, zero length"), que no
+        // sugiere en absoluto cuál es la causa.
+        var destino = input.AsStreamForWrite();
+        await pdf.CopyToAsync(destino, ct).ConfigureAwait(false);
+        await destino.FlushAsync(ct).ConfigureAwait(false);
+
         input.Seek(0);
 
         var document = await PdfDocument.LoadFromStreamAsync(input).AsTask(ct).ConfigureAwait(false);

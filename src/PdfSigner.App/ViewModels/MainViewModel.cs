@@ -120,6 +120,50 @@ public sealed partial class MainViewModel : ObservableObject
         _ = GenerateThumbnailsAsync();
     }
 
+#if DEBUG
+    /// <summary>
+    /// Carga un documento de ejemplo con una firma y un texto ya colocados.
+    /// </summary>
+    /// <remarks>
+    /// Andamio de desarrollo, solo en depuración y solo si está la variable PDFSIGNER_DEMO.
+    /// Permite revisar con la vista los estados que dependen de tener algo seleccionado, que
+    /// de otro modo obligan a abrir un archivo a mano en cada comprobación.
+    /// </remarks>
+    public async Task LoadDemoAsync()
+    {
+        _pdfBytes = Services.DemoContent.CrearPdf();
+        _sourceFileName = "contrato-ejemplo.pdf";
+
+        Elements.Clear();
+        VisibleElements.Clear();
+        Pages.Clear();
+
+        using (var probe = new MemoryStream(_pdfBytes))
+        {
+            for (var i = 0; i < _signer.Inspect(probe).Count; i++)
+                Pages.Add(new PageViewModel(i));
+        }
+
+        CurrentPageIndex = 0;
+        await ShowPageAsync(0);
+        OnPropertyChanged(nameof(HasDocument));
+        OnPropertyChanged(nameof(HasNoDocument));
+
+        AddImageElement(Services.DemoContent.CrearFirma());
+        Register(new ElementViewModel(new TextElement
+        {
+            PageIndex = 0,
+            Bounds = new NormalizedRect(0.12, 0.74, 0.42, 0.10),
+            Text = "Walter E. Calcagno Lucares\nDirector\nFirmado el {fecha}",
+            FontSizePt = 10,
+            ColorHex = "#14145A",
+        }));
+
+        Status = "Documento de ejemplo cargado (modo demo).";
+        _ = GenerateThumbnailsAsync();
+    }
+#endif
+
     // ------------------------------------------------------------- elementos
 
     [RelayCommand]
@@ -171,6 +215,30 @@ public sealed partial class MainViewModel : ObservableObject
         Elements.Remove(Selected);
         VisibleElements.Remove(Selected);
         Selected = null;
+    }
+
+    // ------------------------------------------------------------- deshacer
+
+    /// <summary>Hay algo que deshacer.</summary>
+    /// <remarks>
+    /// De momento siempre falso: la pila de instantáneas llega en la fase 7. El botón existe
+    /// ya, deshabilitado, porque su hueco en la barra condiciona la disposición y es mejor
+    /// verlo desde ahora que reacomodar la barra más tarde.
+    /// </remarks>
+    public bool CanUndo => _historial.Count > 0;
+
+    private readonly Stack<object> _historial = new();
+
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void Undo()
+    {
+        // La restauración real se implementa en la fase 7.
+        if (_historial.Count == 0)
+            return;
+
+        _historial.Pop();
+        OnPropertyChanged(nameof(CanUndo));
+        UndoCommand.NotifyCanExecuteChanged();
     }
 
     public void Select(ElementViewModel? element)

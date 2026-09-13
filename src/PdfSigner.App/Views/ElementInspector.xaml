@@ -85,6 +85,21 @@
                     <Label Text="{Binding SelectedPageLabel}"
                            FontSize="11"
                            TextColor="{StaticResource TextoTenue}" />
+
+                    <!-- Alojamiento temporal. Estas dos acciones salieron de la barra superior
+                         en la fase 2 y su destino es la barra contextual flotante de la fase 3;
+                         mientras tanto viven aquí para no dejarlas sin acceso. -->
+                    <BoxView HeightRequest="1"
+                             Color="{AppThemeBinding Light={StaticResource Separador}, Dark={StaticResource SeparadorOscuro}}"
+                             Margin="0,4" />
+
+                    <Button Text="Guardar como favorita"
+                            Command="{Binding SaveFavoriteCommand}"
+                            FontSize="12" />
+
+                    <Button Text="Eliminar"
+                            Command="{Binding DeleteSelectedCommand}"
+                            FontSize="12" />
                 </VerticalStackLayout>
             </ScrollView>
         </Grid>

@@ -41,23 +41,37 @@
               Style="{StaticResource RegionBarra}"
               ColumnDefinitions="*,Auto">
 
-            <!-- Fase 2 reduce esto a tres botones y saca el resto a la barra contextual. -->
-            <ScrollView Grid.Column="0" Orientation="Horizontal">
+            <!--
+                Acciones de creación. Van en un ScrollView horizontal para que en una pantalla
+                estrecha se desplacen en lugar de recortarse o apilarse.
+
+                "Usar favorita" se queda aquí y no pasa a la barra contextual: coloca una firma
+                nueva, así que hace falta justamente cuando NO hay nada seleccionado. En una
+                barra que solo aparece con selección sería inalcanzable.
+            -->
+            <ScrollView Grid.Column="0" Orientation="Horizontal" VerticalOptions="Center">
                 <HorizontalStackLayout Spacing="8">
                     <Button Text="Abrir PDF" Command="{Binding OpenPdfCommand}" />
                     <Button Text="Añadir firma" Command="{Binding AddImageCommand}" IsEnabled="{Binding HasDocument}" />
                     <Button Text="Añadir texto" Command="{Binding AddTextCommand}" IsEnabled="{Binding HasDocument}" />
                     <Button Text="Usar favorita" Command="{Binding ApplyFavoriteCommand}" IsEnabled="{Binding HasDocument}" />
-                    <Button Text="Guardar favorita" Command="{Binding SaveFavoriteCommand}" IsEnabled="{Binding HasDocument}" />
-                    <Button Text="Eliminar" Command="{Binding DeleteSelectedCommand}" />
                 </HorizontalStackLayout>
             </ScrollView>
 
-            <Button Grid.Column="1"
-                    Text="Exportar"
-                    Command="{Binding ExportCommand}"
-                    IsEnabled="{Binding HasDocument}"
-                    Margin="8,0,0,0" />
+            <!--
+                Deshacer y Exportar quedan fuera del ScrollView, anclados a la derecha: son las
+                dos acciones que nunca deben poder quedarse fuera de la vista.
+            -->
+            <HorizontalStackLayout Grid.Column="1" Spacing="8" Margin="8,0,0,0" VerticalOptions="Center">
+                <Button Text="↶"
+                        Command="{Binding UndoCommand}"
+                        WidthRequest="48"
+                        SemanticProperties.Description="Deshacer el último cambio"
+                        ToolTipProperties.Text="Deshacer" />
+                <Button Text="Exportar"
+                        Command="{Binding ExportCommand}"
+                        IsEnabled="{Binding HasDocument}" />
+            </HorizontalStackLayout>
         </Grid>
 
         <!-- ================================================== REGIÓN 2: canvas -->
@@ -164,28 +178,42 @@
               Style="{StaticResource RegionNavegador}"
               RowDefinitions="Auto,Auto">
 
-            <CollectionView Grid.Row="0"
-                            ItemsSource="{Binding Pages}"
-                            HeightRequest="{StaticResource AltoNavegadorPaginas}"
-                            IsVisible="{Binding HasDocument}">
-                <CollectionView.ItemsLayout>
-                    <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
-                </CollectionView.ItemsLayout>
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="vm:PageViewModel">
-                        <VerticalStackLayout Padding="8,6" Spacing="2">
-                            <VerticalStackLayout.GestureRecognizers>
-                                <TapGestureRecognizer Tapped="OnPageTapped" />
-                            </VerticalStackLayout.GestureRecognizers>
-                            <Image Source="{Binding Thumbnail}" HeightRequest="80" Aspect="AspectFit" />
-                            <Label Text="{Binding Label}" HorizontalOptions="Center" FontSize="12" />
-                        </VerticalStackLayout>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+            <!--
+                El CollectionView va envuelto en un contenedor de altura definida a propósito.
+                Colocado directamente en una fila Auto no se dibujaba, y arrastraba consigo a
+                la barra de estado, que quedaba en blanco. CollectionView necesita que su
+                contenedor tenga un tamaño concreto; con Auto no sabe cuánto medir.
+            -->
+            <Grid Grid.Row="0"
+                  HeightRequest="{StaticResource AltoNavegadorPaginas}"
+                  IsVisible="{Binding HasDocument}">
 
-            <!-- La barra de estado se integra aquí en vez de ser una quinta franja propia. -->
-            <Grid Grid.Row="1" Padding="12,6" ColumnDefinitions="*,Auto">
+                <CollectionView ItemsSource="{Binding Pages}">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PageViewModel">
+                            <VerticalStackLayout Padding="8,6" Spacing="2">
+                                <VerticalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnPageTapped" />
+                                </VerticalStackLayout.GestureRecognizers>
+                                <Image Source="{Binding Thumbnail}" HeightRequest="80" Aspect="AspectFit" />
+                                <Label Text="{Binding Label}" HorizontalOptions="Center" FontSize="12" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+
+            <!-- La barra de estado se integra aquí en vez de ser una quinta franja propia.
+                 Lleva color de fondo propio para no depender de que el estilo del padre se
+                 resuelva bien, que es lo que fallaba. -->
+            <Grid Grid.Row="1"
+                  Padding="12,8"
+                  ColumnDefinitions="*,Auto"
+                  MinimumHeightRequest="34"
+                  BackgroundColor="{AppThemeBinding Light={StaticResource FondoNavegador}, Dark={StaticResource FondoNavegadorOscuro}}">
                 <Label Text="{Binding Status}" Style="{StaticResource EtiquetaEstado}" />
                 <ActivityIndicator Grid.Column="1"
                                    IsRunning="{Binding IsBusy}"

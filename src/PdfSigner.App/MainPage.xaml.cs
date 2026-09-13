@@ -23,6 +23,32 @@ public partial class MainPage : ContentPage
             AplicarDisposicionMovil();
     }
 
+#if DEBUG
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+
+        // Andamio de desarrollo: con la variable PDFSIGNER_DEMO la aplicación arranca con un
+        // documento y una firma ya puestos, para poder revisar los estados que dependen de
+        // tener algo seleccionado sin abrir un archivo a mano cada vez.
+        if (!Services.DemoContent.Activo)
+            return;
+
+        try
+        {
+            await _vm.LoadDemoAsync();
+        }
+        catch (Exception ex)
+        {
+            // El detalle completo va a un archivo: una excepción de WinRT llega con un
+            // mensaje inútil y su causa real solo aparece en la traza.
+            var destino = Path.Combine(Path.GetTempPath(), "pdfsigner-demo-error.txt");
+            File.WriteAllText(destino, ex.ToString());
+            _vm.Status = $"[demo falló: {ex.GetType().Name} · detalle en {destino}]";
+        }
+    }
+#endif
+
     /// <summary>
     /// Reorganiza las cuatro regiones para pantallas de móvil: el inspector deja de ser una
     /// columna lateral y pasa a ser un panel inferior.
