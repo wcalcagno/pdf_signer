@@ -75,11 +75,9 @@
 	  <ProjectReference Include="..\PdfSigner.Core\PdfSigner.Core.csproj" />
 	</ItemGroup>
 
-	<!-- El rasterizador de CoreGraphics sirve igual para iOS y para macCatalyst, así que en
-	     lugar de duplicar el archivo se enlaza el de iOS. MAUI solo compila Platforms\iOS
-	     cuando el target es iOS, de ahí que haga falta incluirlo a mano para macCatalyst. -->
-	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
-		<Compile Include="Platforms\iOS\ApplePdfRasterizer.cs" />
-	</ItemGroup>
+	<!-- Nota: el rasterizador de CoreGraphics vive en Platforms\iOS y sirve igual para
+	     macCatalyst. NO hay que incluirlo a mano aquí: MAUI ya compila Platforms\iOS cuando
+	     el target es macCatalyst, y añadirlo explícitamente provoca NETSDK1022 por elementos
+	     Compile duplicados. -->
 
 </Project>

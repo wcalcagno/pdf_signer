@@ -37,7 +37,7 @@ jobs:
         run: .\installer\build-msi.ps1 -Version 1.0.0 -Arch x64
         shell: pwsh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-msi
           path: dist/*.msi
@@ -54,7 +54,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: microsoft
           java-version: '17'
@@ -65,18 +65,20 @@ jobs:
       # AndroidKeyStore=false firma con la clave de depuración. Es suficiente para
       # instalar el APK a mano, que es como se distribuye fuera de Play Store. Subir a
       # Play exige una clave propia, que iría en los secretos del repositorio.
+      # Sin -o a proposito: con esa opcion el SDK resuelve el RID de la maquina
+      # anfitriona (linux-x64) en vez del de Android y pide un runtime pack de Mono
+      # que no existe, fallando con NU1102.
       - name: Publicar APK
         run: >
           dotnet publish src/PdfSigner.App/PdfSigner.App.csproj
           -f net10.0-android -c Release
           -p:AndroidPackageFormat=apk
           -p:AndroidKeyStore=false
-          -o artefactos/android
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: android-apk
-          path: artefactos/android/*.apk
+          path: src/PdfSigner.App/bin/Release/net10.0-android/**/*.apk
 
   # ------------------------------------------------------------ macCatalyst
   mac:
@@ -89,6 +91,19 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
+
+      # .NET para iOS va atado a una version exacta de Xcode y el runner suele traer una
+      # mas nueva. Se lista lo disponible y se selecciona la compatible si esta presente.
+      - name: Seleccionar Xcode compatible
+        run: |
+          ls /Applications | grep -i '^Xcode' || true
+          for v in 26.0 26.1 26.2; do
+            if [ -d "/Applications/Xcode_$v.app" ]; then
+              sudo xcode-select -s "/Applications/Xcode_$v.app"
+              break
+            fi
+          done
+          xcodebuild -version
 
       - name: Instalar workloads de MAUI
         run: dotnet workload install maui --skip-manifest-update
@@ -110,7 +125,7 @@ jobs:
           cd artefactos/mac
           zip -r -y ../../PdfSigner-macos.zip *.app
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-app
           path: PdfSigner-macos.zip
@@ -130,6 +145,19 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # .NET para iOS va atado a una version exacta de Xcode y el runner suele traer una
+      # mas nueva. Se lista lo disponible y se selecciona la compatible si esta presente.
+      - name: Seleccionar Xcode compatible
+        run: |
+          ls /Applications | grep -i '^Xcode' || true
+          for v in 26.0 26.1 26.2; do
+            if [ -d "/Applications/Xcode_$v.app" ]; then
+              sudo xcode-select -s "/Applications/Xcode_$v.app"
+              break
+            fi
+          done
+          xcodebuild -version
+
       - name: Instalar workloads de MAUI
         run: dotnet workload install maui --skip-manifest-update
 
@@ -147,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: paquetes
 
