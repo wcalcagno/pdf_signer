@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/wcalcagno/pdf_signer/actions/workflows/ci.yml/badge.svg)](https://github.com/wcalcagno/pdf_signer/actions/workflows/ci.yml)
 [![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-blue.svg)](LICENSE)
+[![Última versión](https://img.shields.io/github/v/release/wcalcagno/pdf_signer)](https://github.com/wcalcagno/pdf_signer/releases/latest)
 
 Aplicación libre y multiplataforma para firmar PDFs: coloca tu imagen de firma y un
 bloque de texto donde quieras, y exporta el documento con esa firma **incrustada como
@@ -56,7 +57,7 @@ entre plataformas y este proyecto se ha desarrollado en una máquina Windows:
 
 | Plataforma | Estado | Detalle |
 |---|---|---|
-| **Windows** | ✅ Probado | Compila sin advertencias, arranca, rasteriza páginas y produce PDFs correctos incluso con `/Rotate`. El MSI se ha instalado, ejecutado y desinstalado sin dejar restos. |
+| **Windows** | ✅ Probado en uso real | Se ha usado de principio a fin sobre documentos reales de varias páginas: abrir, colocar la firma, arrastrarla, redimensionarla por las esquinas, deshacer, guardar favorita, navegar entre páginas y exportar. El instalador se ha instalado, ejecutado y desinstalado sin dejar restos. |
 | **Android** | 🟡 Compila | Se genera el APK en CI, pero **nadie lo ha ejecutado en un dispositivo**. |
 | **macOS** | 🟡 Compila | Se genera el `.app` en CI, pero **nadie lo ha ejecutado**. |
 | **iOS** | ⚠️ Sin compilar | No por el código: el runner de CI no tiene ningún runtime de simulador compatible con el Xcode que exige .NET para iOS 26, y `actool` falla antes de terminar. El mismo rasterizador de CoreGraphics **sí compila** en el trabajo de macOS, que comparte ese archivo. |
