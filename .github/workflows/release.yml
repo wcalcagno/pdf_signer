@@ -227,10 +227,17 @@ jobs:
           path: paquetes
 
       # download/README.md promete estas sumas, asi que se generan de verdad.
+      #
+      # Se listan por NOMBRE DE ARCHIVO, no por ruta: los artefactos llegan dentro de
+      # subcarpetas propias de la compilacion, y un usuario que descarga de la release ve
+      # solo el nombre. Ademas algunos aparecen por partida doble (en bin y en publish),
+      # de ahi el sort -u: la primera version del fichero listaba el mismo APK dos veces.
       - name: Calcular sumas de verificación
         run: |
           cd paquetes
-          find . -type f ! -name 'SHA256SUMS.txt' -exec sha256sum {} \; | sed 's|\./[^/]*/||' > SHA256SUMS.txt
+          find . -type f ! -name 'SHA256SUMS.txt' | while read -r archivo; do
+            printf '%s  %s\n' "$(sha256sum "$archivo" | cut -d' ' -f1)" "$(basename "$archivo")"
+          done | sort -u > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - uses: softprops/action-gh-release@v2
