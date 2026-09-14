@@ -84,10 +84,13 @@ jobs:
           -p:AndroidKeyStore=false
           -p:RuntimeIdentifier=android-arm64
 
+      # Solo el APK firmado. La compilación deja también uno sin firmar, que Android se
+      # niega a instalar: publicar los dos solo sirve para que alguien descargue el que
+      # no funciona.
       - uses: actions/upload-artifact@v7
         with:
           name: android-apk
-          path: src/PdfSigner.App/bin/Release/net10.0-android/**/*.apk
+          path: src/PdfSigner.App/bin/Release/net10.0-android/**/*-Signed.apk
 
   # ------------------------------------------------------------ macCatalyst
   mac:
