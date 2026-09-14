@@ -117,9 +117,15 @@
                                           HorizontalOptions="Start"
                                           VerticalOptions="Start">
 
+                                        <!-- Scale y Opacity van en el Border y no en el Grid
+                                             exterior: escalar el Grid movería también las asas
+                                             respecto de las esquinas, justo mientras se está
+                                             apuntando a ellas. -->
                                         <Border BackgroundColor="Transparent"
                                                 Stroke="{Binding OutlineColor}"
-                                                StrokeThickness="{Binding OutlineThickness}">
+                                                StrokeThickness="{Binding OutlineThickness}"
+                                                Scale="{Binding ContentScale}"
+                                                Opacity="{Binding ContentOpacity}">
 
                                             <Border.GestureRecognizers>
                                                 <PanGestureRecognizer PanUpdated="OnElementPan" />

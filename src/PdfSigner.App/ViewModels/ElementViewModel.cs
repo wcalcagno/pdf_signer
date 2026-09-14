@@ -177,17 +177,51 @@ public sealed partial class ElementViewModel : ObservableObject
     public Color TextColor =>
         AsText is { } t && Color.TryParse(t.ColorHex, out var color) ? color : Colors.Black;
 
-    // ---- Apariencia de la selección ----
+    // ---- Apariencia de la selección y del arrastre ----
+    //
     // Se exponen como propiedades y no como convertidores en XAML para que la plantilla quede
     // legible y no haya que registrar convertidores solo para pintar un borde.
 
+    /// <summary>El elemento se está moviendo o redimensionando ahora mismo.</summary>
+    /// <remarks>
+    /// Sirve únicamente para dar respuesta visual inmediata. El usuario necesita saber que ha
+    /// agarrado algo en el instante en que lo agarra, sobre todo con el dedo, donde además
+    /// tiene el propio dedo tapando el elemento. Ponerlo en la barra de estado llegaría tarde
+    /// y al sitio equivocado: el ojo está en la página, no en el pie de la ventana.
+    /// </remarks>
+    [ObservableProperty]
+    public partial bool IsDragging { get; set; }
+
     public Color OutlineColor => IsSelected ? Colors.DodgerBlue : Colors.Transparent;
 
-    public double OutlineThickness => IsSelected ? 2 : 0;
+    public double OutlineThickness => IsDragging ? 3.5 : IsSelected ? 2 : 0;
+
+    /// <summary>Ampliación sutil mientras se arrastra: da sensación de "levantado".</summary>
+    /// <remarks>
+    /// Se aplica solo al contenido, no a las asas: escalarlas las movería respecto de las
+    /// esquinas justo mientras se está apuntando a ellas.
+    ///
+    /// Es un 2%: suficiente para notarlo, insuficiente para que el elemento parezca cambiar
+    /// de tamaño, que es precisamente lo que se está a punto de hacer con las asas.
+    /// </remarks>
+    public double ContentScale => IsDragging ? 1.02 : 1.0;
+
+    public double ContentOpacity => IsDragging ? 0.9 : 1.0;
 
     partial void OnIsSelectedChanged(bool value)
     {
+        // Soltar la selección cancela cualquier arrastre en curso.
+        if (!value)
+            IsDragging = false;
+
         OnPropertyChanged(nameof(OutlineColor));
         OnPropertyChanged(nameof(OutlineThickness));
+    }
+
+    partial void OnIsDraggingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(OutlineThickness));
+        OnPropertyChanged(nameof(ContentScale));
+        OnPropertyChanged(nameof(ContentOpacity));
     }
 }

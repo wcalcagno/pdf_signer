@@ -159,6 +159,9 @@ public sealed partial class MainViewModel : ObservableObject
             ColorHex = "#14145A",
         }));
 
+        if (Services.DemoContent.SimularArrastre && Selected is not null)
+            Selected.IsDragging = true;
+
         Status = "Documento de ejemplo cargado (modo demo).";
         _ = GenerateThumbnailsAsync();
     }

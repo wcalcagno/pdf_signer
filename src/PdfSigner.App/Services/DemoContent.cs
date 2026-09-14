@@ -25,6 +25,17 @@ internal static class DemoContent
     public static bool Activo =>
         !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(VariableEntorno));
 
+    /// <summary>
+    /// Con PDFSIGNER_DEMO=drag el elemento arranca marcado como si se estuviera arrastrando.
+    /// </summary>
+    /// <remarks>
+    /// Existe porque una captura de pantalla es estática y no puede simular un gesto: sin
+    /// esto no habría forma de comprobar con la vista que el aviso de arrastre se dibuja.
+    /// </remarks>
+    public static bool SimularArrastre =>
+        string.Equals(Environment.GetEnvironmentVariable(VariableEntorno), "drag",
+            StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Documento de dos páginas con aspecto de contrato.</summary>
     public static byte[] CrearPdf()
     {

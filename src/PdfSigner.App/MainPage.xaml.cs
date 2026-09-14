@@ -163,6 +163,7 @@ public partial class MainPage : ContentPage
                 _lastPanX = 0;
                 _lastPanY = 0;
                 _vm.Select(vm);
+                vm.IsDragging = true;
                 break;
 
             case GestureStatus.Running:
@@ -175,6 +176,14 @@ public partial class MainPage : ContentPage
                 // real de la página, el lienzo de referencia de los elementos ya está en
                 // píxeles de pantalla.
                 vm.Move(dx, dy);
+                break;
+
+            // Completed y Canceled deben tratarse los DOS. Si solo se atendiera Completed, un
+            // gesto interrumpido (el dedo sale de la pantalla, otra ventana roba el foco)
+            // dejaría el elemento agrandado para siempre.
+            case GestureStatus.Completed:
+            case GestureStatus.Canceled:
+                vm.IsDragging = false;
                 break;
         }
     }
@@ -192,6 +201,7 @@ public partial class MainPage : ContentPage
                 _lastPanX = 0;
                 _lastPanY = 0;
                 _vm.Select(vm);
+                vm.IsDragging = true;
                 break;
 
             case GestureStatus.Running:
@@ -200,6 +210,11 @@ public partial class MainPage : ContentPage
                 _lastPanX = e.TotalX;
                 _lastPanY = e.TotalY;
                 vm.Resize(esquina, dx, dy);
+                break;
+
+            case GestureStatus.Completed:
+            case GestureStatus.Canceled:
+                vm.IsDragging = false;
                 break;
         }
     }
