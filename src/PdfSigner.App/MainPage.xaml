@@ -221,16 +221,20 @@
             <Grid x:Name="CapaFlotante" InputTransparent="True" CascadeInputTransparent="False">
 
                 <!--
-                    Barra contextual. Va anclada arriba y centrada, NO junto al elemento
-                    seleccionado. Colocarla junto al elemento obligaría a traducir coordenadas
-                    de página a pantalla contando zoom y desplazamiento del ScrollView, saldría
-                    fuera de la vista al arrastrar hacia un borde, y daría saltos mientras se
-                    mueve la firma. Anclada es más simple y más estable de leer.
+                    Barra contextual. Va anclada y centrada, NO junto al elemento seleccionado.
+                    Colocarla junto al elemento obligaría a traducir coordenadas de página a
+                    pantalla contando zoom y desplazamiento del ScrollView, saldría fuera de la
+                    vista al arrastrar hacia un borde, y daría saltos mientras se mueve la firma.
+
+                    Anclada ABAJO y no arriba: probando con un acta real se vio que arriba
+                    tapaba las primeras líneas del documento, que es justo donde suele estar el
+                    encabezado que hace falta leer para saber qué se está firmando. La parte
+                    baja del lienzo suele ser margen.
                 -->
                 <Border IsVisible="{Binding HasSelection}"
                         HorizontalOptions="Center"
-                        VerticalOptions="Start"
-                        Margin="0,14,0,0"
+                        VerticalOptions="End"
+                        Margin="0,0,0,14"
                         Padding="6"
                         StrokeThickness="1"
                         Stroke="{AppThemeBinding Light={StaticResource Separador}, Dark={StaticResource SeparadorOscuro}}"
