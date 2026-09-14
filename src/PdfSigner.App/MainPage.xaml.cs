@@ -118,7 +118,7 @@ public partial class MainPage : ContentPage
             return;
 
         var destino = _vm.HasSelection ? 0 : _altoSheet;
-        await Inspector.TranslateTo(0, destino, 180, Easing.CubicOut);
+        await Inspector.TranslateToAsync(0, destino, 180, Easing.CubicOut);
     }
 
     /// <summary>
@@ -183,9 +183,6 @@ public partial class MainPage : ContentPage
                 vm.Move(dx, dy);
                 break;
 
-            // Completed y Canceled deben tratarse los DOS. Si solo se atendiera Completed, un
-            // gesto interrumpido (el dedo sale de la pantalla, otra ventana roba el foco)
-            // dejaría el elemento agrandado para siempre.
             // Completed y Canceled deben tratarse los DOS. Si solo se atendiera Completed, un
             // gesto interrumpido (el dedo sale de la pantalla, otra ventana roba el foco)
             // dejaría el elemento agrandado para siempre.

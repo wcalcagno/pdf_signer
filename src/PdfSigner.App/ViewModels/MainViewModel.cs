@@ -626,6 +626,13 @@ public sealed partial class MainViewModel : ObservableObject
 
         await _favorites.SaveAsync(favorite, image?.ImageData);
         OnPropertyChanged(nameof(HasFavorite));
+
+        // Guardar la favorita cierra el elemento: la acción termina ahí. Sin esto la barra
+        // contextual se quedaba flotando sobre el documento tapando texto, mientras que
+        // Eliminar sí la cerraba. Dos botones de la misma barra comportándose distinto es
+        // más desconcertante que el estorbo en sí.
+        Select(null);
+
         Status = "Firma favorita guardada en este dispositivo.";
     }
 
