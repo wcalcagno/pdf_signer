@@ -57,6 +57,30 @@ public sealed partial class ElementViewModel : ObservableObject
     /// </remarks>
     public Thickness Position => new(X, Y, 0, 0);
 
+    // ---- Contenedor ampliado para las asas ----
+    //
+    // Las asas se dibujan centradas sobre las esquinas, o sea que la mitad de cada una queda
+    // fuera del elemento. Dibujarlas fuera del contenedor funciona, pero los CLICS en esa
+    // zona no: en XAML el hit-testing no suele salir de los límites del contenedor padre.
+    // El resultado era que solo respondía el cuarto interior de cada asa, que además compite
+    // con el gesto de mover del propio elemento, y hacían falta varios intentos para agarrar
+    // una esquina.
+    //
+    // La solución es que el contenedor abarque también las asas: se agranda un radio de asa
+    // por cada lado y el elemento se dibuja centrado dentro, con ese mismo margen.
+
+    /// <summary>Radio del área táctil del asa. La mitad de los 44 px recomendados.</summary>
+    public const double HandleRadius = 22;
+
+    /// <summary>Margen interior del elemento dentro del contenedor ampliado.</summary>
+    public Thickness HitPadding => new(HandleRadius);
+
+    public Thickness HitPosition => new(X - HandleRadius, Y - HandleRadius, 0, 0);
+
+    public double HitWidth => Width + HandleRadius * 2;
+
+    public double HitHeight => Height + HandleRadius * 2;
+
     /// <summary>Fuente de imagen lista para enlazar, o null si es un bloque de texto.</summary>
     public ImageSource? Preview =>
         ImageData is { Length: > 0 } data ? ImageSource.FromStream(() => new MemoryStream(data)) : null;
@@ -108,6 +132,9 @@ public sealed partial class ElementViewModel : ObservableObject
         OnPropertyChanged(nameof(Width));
         OnPropertyChanged(nameof(Height));
         OnPropertyChanged(nameof(Position));
+        OnPropertyChanged(nameof(HitPosition));
+        OnPropertyChanged(nameof(HitWidth));
+        OnPropertyChanged(nameof(HitHeight));
     }
 
     public void NotifyTextChanged()

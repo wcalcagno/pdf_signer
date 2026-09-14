@@ -106,14 +106,22 @@
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ElementViewModel">
                                     <!--
-                                        Las asas cuelgan de este Grid y no del Border interior
-                                        porque sobresalen de los bordes del elemento con
-                                        márgenes negativos, y dentro del Border quedarían
-                                        recortadas.
+                                        Este contenedor es MAYOR que el elemento: se extiende
+                                        un radio de asa por cada lado, y el elemento va dentro
+                                        con ese mismo margen.
+
+                                        No es un capricho de maquetación. Las asas se centran
+                                        sobre las esquinas, así que la mitad de cada una cae
+                                        fuera del elemento. Dibujar fuera del contenedor
+                                        funciona, pero los CLICS en esa zona no: el hit-testing
+                                        no sale de los límites del padre. Con el contenedor
+                                        pequeño solo respondía el cuarto interior de cada asa,
+                                        que además compite con el gesto de mover, y agarrar una
+                                        esquina costaba varios intentos.
                                     -->
-                                    <Grid Margin="{Binding Position}"
-                                          WidthRequest="{Binding Width}"
-                                          HeightRequest="{Binding Height}"
+                                    <Grid Margin="{Binding HitPosition}"
+                                          WidthRequest="{Binding HitWidth}"
+                                          HeightRequest="{Binding HitHeight}"
                                           HorizontalOptions="Start"
                                           VerticalOptions="Start">
 
@@ -121,7 +129,8 @@
                                              exterior: escalar el Grid movería también las asas
                                              respecto de las esquinas, justo mientras se está
                                              apuntando a ellas. -->
-                                        <Border BackgroundColor="Transparent"
+                                        <Border Margin="{Binding HitPadding}"
+                                                BackgroundColor="Transparent"
                                                 Stroke="{Binding OutlineColor}"
                                                 StrokeThickness="{Binding OutlineThickness}"
                                                 Scale="{Binding ContentScale}"
@@ -159,7 +168,7 @@
                                               Style="{StaticResource AreaAsa}"
                                               IsVisible="{Binding IsSelected}"
                                               HorizontalOptions="Start" VerticalOptions="Start"
-                                              Margin="-22,-22,0,0">
+                                              Margin="0">
                                             <Grid.GestureRecognizers>
                                                 <PanGestureRecognizer PanUpdated="OnHandlePan" />
                                             </Grid.GestureRecognizers>
@@ -170,7 +179,7 @@
                                               Style="{StaticResource AreaAsa}"
                                               IsVisible="{Binding IsSelected}"
                                               HorizontalOptions="End" VerticalOptions="Start"
-                                              Margin="0,-22,-22,0">
+                                              Margin="0">
                                             <Grid.GestureRecognizers>
                                                 <PanGestureRecognizer PanUpdated="OnHandlePan" />
                                             </Grid.GestureRecognizers>
@@ -181,7 +190,7 @@
                                               Style="{StaticResource AreaAsa}"
                                               IsVisible="{Binding IsSelected}"
                                               HorizontalOptions="Start" VerticalOptions="End"
-                                              Margin="-22,0,0,-22">
+                                              Margin="0">
                                             <Grid.GestureRecognizers>
                                                 <PanGestureRecognizer PanUpdated="OnHandlePan" />
                                             </Grid.GestureRecognizers>
@@ -192,7 +201,7 @@
                                               Style="{StaticResource AreaAsa}"
                                               IsVisible="{Binding IsSelected}"
                                               HorizontalOptions="End" VerticalOptions="End"
-                                              Margin="0,0,-22,-22">
+                                              Margin="0">
                                             <Grid.GestureRecognizers>
                                                 <PanGestureRecognizer PanUpdated="OnHandlePan" />
                                             </Grid.GestureRecognizers>
