@@ -178,39 +178,33 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # .NET para iOS va atado a una version exacta de Xcode y el runner suele traer una
-      # mas nueva. Se lista lo disponible y se selecciona la compatible si esta presente.
-      - name: Seleccionar Xcode compatible
+      # Se usa el Xcode POR DEFECTO del runner, no una version antigua concreta.
+      #
+      # El intento anterior seleccionaba Xcode 26.0 porque .NET para iOS lo exigia, pero esa
+      # instalacion del runner esta incompleta: sus runtimes de simulador no casan con su
+      # propio SDK y actool moria con "No simulator runtime version available". El Xcode por
+      # defecto si esta completo, asi que en vez de bajar el Xcode se sube el workload.
+      - name: Preparar Xcode
         run: |
           ls /Applications | grep -i '^Xcode' || true
-          # No basta con que la carpeta exista: en los runners hay instalaciones
-          # parciales de Xcode sin el SDK de macOS, y al seleccionarlas el build
-          # revienta mas tarde con "actool not found". Se comprueba el SDK antes.
-          elegido=""
-          for c in /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app /Applications/Xcode.app; do
-            if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
-              elegido="$c"
-              break
-            fi
-          done
-          if [ -z "$elegido" ]; then
-            echo "No se encontro ningun Xcode con el SDK de macOS completo"; exit 1
-          fi
-          echo "Usando $elegido"
-          sudo xcode-select -s "$elegido"
+          sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
+          echo "--- runtimes de simulador disponibles ---"
+          xcrun simctl list runtimes || true
 
-      - name: Instalar workloads de MAUI
-        run: dotnet workload install maui --skip-manifest-update
+      - name: Instalar y actualizar workloads de MAUI
+        run: |
+          dotnet workload install maui --skip-manifest-update
+          # La actualizacion trae el Microsoft.iOS.Sdk mas reciente, que es lo que puede
+          # aceptar el Xcode del runner.
+          dotnet workload update
+          dotnet workload list
 
-      # Se compila para dispositivo y no para simulador: el runner no trae un runtime de
-      # simulador que case con el SDK del Xcode seleccionado, y actool falla por eso. La
-      # firma va desactivada porque no hay cuenta de Apple; basta para validar el codigo.
-      - name: Compilar para dispositivo
+      - name: Compilar para simulador
         run: >
           dotnet build src/PdfSigner.App/PdfSigner.App.csproj
           -f net10.0-ios -c Release
-          -p:RuntimeIdentifier=ios-arm64
+          -p:RuntimeIdentifier=iossimulator-arm64
           -p:EnableCodeSigning=false
           -p:CodesignRequireProvisioningProfile=false
 
