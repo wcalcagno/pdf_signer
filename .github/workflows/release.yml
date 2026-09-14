@@ -33,8 +33,14 @@ jobs:
           dotnet tool install --global wix --version 6.0.2
           wix extension add --global WixToolset.UI.wixext/6.0.2
 
+      # La version sale de la etiqueta. Con 1.0.0 escrito a fuego, una release v1.0.3
+      # habria llevado dentro un instalador que dice ser 1.0.0.
       - name: Construir el MSI
-        run: .\installer\build-msi.ps1 -Version 1.0.0 -Arch x64
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { $version = '0.0.0' }
+          Write-Output "Version del instalador: $version"
+          .\installer\build-msi.ps1 -Version $version -Arch x64
         shell: pwsh
 
       - uses: actions/upload-artifact@v7
@@ -228,3 +234,28 @@ jobs:
         with:
           files: paquetes/**/*
           generate_release_notes: true
+          body: |
+            Aplicación libre para firmar PDFs colocando una imagen de firma y un bloque de
+            texto sobre la página. Es firma **visual**, no criptográfica.
+
+            ## Qué descargar
+
+            | Sistema | Archivo | Nota |
+            |---|---|---|
+            | Windows 10/11 | `PdfSigner-*-win-x64.msi` | No pide permisos de administrador |
+            | Android 5+ | `*-Signed.apk` | Hay que permitir orígenes desconocidos |
+            | macOS 15+ | `PdfSigner-macos.zip` | Clic derecho → Abrir, la primera vez |
+            | iOS | — | No distribuible sin cuenta de desarrollador de Apple |
+
+            Ningún paquete está firmado digitalmente, así que los tres sistemas avisarán de
+            editor desconocido. El porqué y las instrucciones detalladas están en
+            [download/README.md](https://github.com/wcalcagno/pdf_signer/blob/main/download/README.md).
+
+            `SHA256SUMS.txt` trae las sumas de verificación de todos los archivos.
+
+            ## Estado por plataforma
+
+            **Windows está probado**: se ha usado con documentos reales de principio a fin,
+            incluido exportar. **Android y macOS compilan y se empaquetan, pero nadie los ha
+            ejecutado todavía.** Si los pruebas, un issue contando qué pasó es la contribución
+            más útil ahora mismo.
