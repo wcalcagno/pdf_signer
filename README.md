@@ -69,7 +69,7 @@ la firma, exportar— no la ha probado nadie todavía.
 **Si lo pruebas en alguna de esas plataformas, un issue contando qué pasó es la
 contribución más valiosa que puedes hacer ahora mismo.**
 
-El núcleo de firma (`PdfSigner.Core`) está cubierto por **155 pruebas** que corren en CI sin
+El núcleo de firma (`PdfSigner.Core`) está cubierto por **176 pruebas** que corren en CI sin
 emulador ni Mac, y es donde vive toda la lógica que puede producir un PDF incorrecto.
 
 ## Arquitectura
@@ -79,7 +79,7 @@ Tres proyectos, con una separación que no es decorativa:
 ```
 src/PdfSigner.Core/    Lógica de firma. .NET puro, sin MAUI.
 src/PdfSigner.App/     Interfaz MAUI y código específico de cada plataforma.
-tests/PdfSigner.Core.Tests/   155 pruebas, corren en CI sin emulador ni Mac.
+tests/PdfSigner.Core.Tests/   176 pruebas, corren en CI sin emulador ni Mac.
 ```
 
 `PdfSigner.Core` **no referencia MAUI**. Gracias a eso, la parte que de verdad puede
