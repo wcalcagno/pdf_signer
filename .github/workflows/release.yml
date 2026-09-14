@@ -178,34 +178,38 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Hacen falta TRES versiones alineadas, y el runner no las alinea solo:
+      # La numeracion de .NET para iOS y la de Xcode NO se corresponden: el SDK 26.5 exige
+      # Xcode 26.6. Y el runner no tiene runtime de simulador para 26.6, solo para 26.2,
+      # 26.4 y 26.5. Por eso se compila para DISPOSITIVO mas abajo: un build de dispositivo
+      # no necesita ningun runtime de simulador.
       #
-      #   1. el Xcode seleccionado
-      #   2. el Microsoft.iOS.Sdk que instala el workload
-      #   3. un runtime de simulador de iOS instalado
-      #
-      # El runner trae catorce Xcodes (26.0 a 26.6) pero solo tres runtimes de simulador:
-      # iOS 26.2, 26.4 y 26.5. Con el Xcode por defecto (26.6) no hay runtime, y con el 26.0
-      # que pedia el workload sin actualizar, tampoco. La version util es la 26.5, que es la
-      # mas alta con runtime disponible y la que trae dotnet workload update.
+      # Ademas no vale cualquier carpeta: /Applications/Xcode.app resulto no tener el SDK de
+      # macOS, y sin el, actool no se puede localizar. Se comprueba antes de elegir.
       - name: Preparar Xcode
         run: |
           ls /Applications | grep -i '^Xcode' || true
+          echo "--- cuales tienen el SDK de macOS ---"
+          for c in /Applications/Xcode_26.6.app /Applications/Xcode_26.6.0.app /Applications/Xcode.app; do
+            if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
+              echo "  OK  $c"
+            else
+              echo "  --  $c (sin SDK de macOS)"
+            fi
+          done
+
           elegido=""
-          for v in 26.5 26.4 26.2; do
-            if [ -d "/Applications/Xcode_$v.app" ]; then
-              elegido="/Applications/Xcode_$v.app"
+          for c in /Applications/Xcode_26.6.app /Applications/Xcode_26.6.0.app /Applications/Xcode.app; do
+            if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
+              elegido="$c"
               break
             fi
           done
           if [ -z "$elegido" ]; then
-            echo "Ningun Xcode con runtime de simulador conocido"; exit 1
+            echo "Ningun Xcode 26.6 con el SDK de macOS completo"; exit 1
           fi
           echo "Usando $elegido"
           sudo xcode-select -s "$elegido"
           xcodebuild -version
-          echo "--- runtimes de simulador disponibles ---"
-          xcrun simctl list runtimes || true
 
       - name: Instalar y actualizar workloads de MAUI
         run: |
@@ -215,11 +219,15 @@ jobs:
           dotnet workload update
           dotnet workload list
 
-      - name: Compilar para simulador
+      # Para dispositivo y no para simulador: asi no hace falta ningun runtime de simulador,
+      # que es lo que no tiene el runner para la version de Xcode que exige el SDK. La firma
+      # va desactivada porque no hay cuenta de Apple; el objetivo es unicamente comprobar
+      # que el codigo de iOS es valido.
+      - name: Compilar para dispositivo
         run: >
           dotnet build src/PdfSigner.App/PdfSigner.App.csproj
           -f net10.0-ios -c Release
-          -p:RuntimeIdentifier=iossimulator-arm64
+          -p:RuntimeIdentifier=ios-arm64
           -p:EnableCodeSigning=false
           -p:CodesignRequireProvisioningProfile=false
 
