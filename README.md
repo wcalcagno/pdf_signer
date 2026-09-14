@@ -154,10 +154,16 @@ dotnet test tests/PdfSigner.Core.Tests/PdfSigner.Core.Tests.csproj
 ## Uso
 
 1. **Abrir PDF** y navegar por las páginas con la tira de miniaturas.
-2. **Añadir firma** para colocar una imagen PNG o JPG; arrástrala y ajústala con el asa de
-   la esquina.
-3. **Añadir texto** para un bloque multilínea con tamaño y color configurables.
-4. **Exportar**: diálogo de guardado en escritorio, hoja de compartir en móvil.
+2. **Añadir firma** para colocar una imagen PNG o JPG. Arrástrala para moverla y usa
+   cualquiera de las **cuatro asas de las esquinas** para cambiar su tamaño: la esquina
+   opuesta se queda donde está.
+3. **Añadir texto** para un bloque multilínea, con tamaño y una paleta de colores.
+4. **Deshacer** (↶) retrocede el último movimiento, cambio de tamaño o borrado.
+5. **Exportar**: diálogo de guardado en escritorio, hoja de compartir en móvil.
+
+Al seleccionar un elemento aparecen sus propiedades: en escritorio, en una columna fija a
+la derecha; en móvil, en un panel que sube desde abajo. Sobre la página flota además una
+barra con las acciones que dependen de lo seleccionado.
 
 Cada firma y cada texto quedan **anclados a la página donde los colocaste**, así que puedes
 firmar varias páginas de un mismo documento.

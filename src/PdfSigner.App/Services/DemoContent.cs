@@ -32,9 +32,11 @@ internal static class DemoContent
     /// Existe porque una captura de pantalla es estática y no puede simular un gesto: sin
     /// esto no habría forma de comprobar con la vista que el aviso de arrastre se dibuja.
     /// </remarks>
-    public static bool SimularArrastre =>
-        string.Equals(Environment.GetEnvironmentVariable(VariableEntorno), "drag",
-            StringComparison.OrdinalIgnoreCase);
+    public static bool SimularArrastre => Modo == "drag";
+
+    /// <summary>Modo del arnés: "1", "drag", "moved" o "undo".</summary>
+    public static string Modo =>
+        Environment.GetEnvironmentVariable(VariableEntorno)?.ToLowerInvariant() ?? string.Empty;
 
     /// <summary>Documento de dos páginas con aspecto de contrato.</summary>
     public static byte[] CrearPdf()

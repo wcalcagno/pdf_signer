@@ -164,6 +164,11 @@ public partial class MainPage : ContentPage
                 _lastPanY = 0;
                 _vm.Select(vm);
                 vm.IsDragging = true;
+
+                // UNA instantánea por gesto, no una por aviso de movimiento. Un arrastre
+                // genera decenas de avisos; guardando uno por cada uno haría falta pulsar
+                // deshacer cuarenta veces para retroceder un solo movimiento.
+                _vm.PushSnapshot(vm, "mover el elemento");
                 break;
 
             case GestureStatus.Running:
@@ -181,9 +186,16 @@ public partial class MainPage : ContentPage
             // Completed y Canceled deben tratarse los DOS. Si solo se atendiera Completed, un
             // gesto interrumpido (el dedo sale de la pantalla, otra ventana roba el foco)
             // dejaría el elemento agrandado para siempre.
+            // Completed y Canceled deben tratarse los DOS. Si solo se atendiera Completed, un
+            // gesto interrumpido (el dedo sale de la pantalla, otra ventana roba el foco)
+            // dejaría el elemento agrandado para siempre.
             case GestureStatus.Completed:
             case GestureStatus.Canceled:
                 vm.IsDragging = false;
+
+                // Un clic sin movimiento empieza y termina un arrastre sin cambiar nada:
+                // su instantánea se descarta para no dejar pasos de deshacer vacíos.
+                _vm.FinishGesture(vm);
                 break;
         }
     }
@@ -202,6 +214,7 @@ public partial class MainPage : ContentPage
                 _lastPanY = 0;
                 _vm.Select(vm);
                 vm.IsDragging = true;
+                _vm.PushSnapshot(vm, "cambiar el tamaño");
                 break;
 
             case GestureStatus.Running:
@@ -215,6 +228,7 @@ public partial class MainPage : ContentPage
             case GestureStatus.Completed:
             case GestureStatus.Canceled:
                 vm.IsDragging = false;
+                _vm.FinishGesture(vm);
                 break;
         }
     }

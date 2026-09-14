@@ -102,6 +102,11 @@ public sealed partial class MainViewModel : ObservableObject
             VisibleElements.Clear();
             Pages.Clear();
 
+            // El historial apunta a elementos del documento anterior: deshacer sobre el nuevo
+            // haría reaparecer firmas que no son de aquí.
+            _historial.Clear();
+            NotificarHistorial();
+
             using var probe = new MemoryStream(_pdfBytes);
             var geometry = _signer.Inspect(probe);
             for (var i = 0; i < geometry.Count; i++)
@@ -163,6 +168,18 @@ public sealed partial class MainViewModel : ObservableObject
             Selected.IsDragging = true;
 
         Status = "Documento de ejemplo cargado (modo demo).";
+
+        // Modos que ejercitan el deshacer sin necesidad de un gesto real. Una captura es
+        // estática, así que esta es la única forma de comprobar que el mecanismo funciona.
+        if (Services.DemoContent.Modo is "moved" or "undo" && Selected is not null)
+        {
+            PushSnapshot(Selected, "mover el elemento");
+            Selected.Move(140, -110);
+            Status = $"Elemento desplazado. Deshacer disponible: {CanUndo}.";
+
+            if (Services.DemoContent.Modo == "undo")
+                UndoCommand.Execute(null);
+        }
         _ = GenerateThumbnailsAsync();
     }
 #endif
@@ -215,31 +232,109 @@ public sealed partial class MainViewModel : ObservableObject
         if (Selected is null)
             return;
 
-        Elements.Remove(Selected);
-        VisibleElements.Remove(Selected);
+        var elemento = Selected;
+
+        // La instantánea se toma ANTES de quitarlo de la lista: necesita su posición para
+        // devolverlo al mismo sitio.
+        PushSnapshot(
+            elemento,
+            elemento.IsText ? "eliminar el bloque de texto" : "eliminar la firma",
+            eliminado: true);
+
+        Elements.Remove(elemento);
+        VisibleElements.Remove(elemento);
         Selected = null;
     }
 
     // ------------------------------------------------------------- deshacer
 
-    /// <summary>Hay algo que deshacer.</summary>
+    /// <summary>Tope de la pila de deshacer.</summary>
     /// <remarks>
-    /// De momento siempre falso: la pila de instantáneas llega en la fase 7. El botón existe
-    /// ya, deshabilitado, porque su hueco en la barra condiciona la disposición y es mejor
-    /// verlo desde ahora que reacomodar la barra más tarde.
+    /// Un límite evita que una sesión larga acumule instantáneas sin fin. Cincuenta pasos son
+    /// muchos más de los que nadie va a retroceder firmando un contrato.
     /// </remarks>
+    private const int MaximoHistorial = 50;
+
+    private readonly LinkedList<ElementSnapshot> _historial = new();
+
     public bool CanUndo => _historial.Count > 0;
 
-    private readonly Stack<object> _historial = new();
+    /// <summary>
+    /// Guarda el estado de un elemento ANTES de modificarlo.
+    /// </summary>
+    /// <remarks>
+    /// Se llama una sola vez al empezar un gesto, no en cada aviso de movimiento. Un arrastre
+    /// genera decenas de avisos, y guardar uno por cada uno haría falta pulsar deshacer
+    /// cuarenta veces para retroceder un único movimiento.
+    /// </remarks>
+    public void PushSnapshot(ElementViewModel element, string descripcion, bool eliminado = false)
+    {
+        _historial.AddLast(new ElementSnapshot
+        {
+            Element = element,
+            Bounds = element.Element.Bounds,
+            WasDeleted = eliminado,
+            Index = Elements.IndexOf(element),
+            Descripcion = descripcion,
+        });
+
+        // Se descarta por el extremo antiguo: lo que se pierde es lo más lejano en el tiempo.
+        while (_historial.Count > MaximoHistorial)
+            _historial.RemoveFirst();
+
+        NotificarHistorial();
+    }
+
+    /// <summary>
+    /// Cierra un gesto y descarta su instantánea si no cambió nada.
+    /// </summary>
+    /// <remarks>
+    /// Un clic sobre un elemento inicia y termina un arrastre sin moverlo. Sin esto, cada clic
+    /// dejaría un paso de deshacer que aparentemente no hace nada, y el usuario tendría que
+    /// pulsar el botón varias veces antes de ver algún efecto.
+    /// </remarks>
+    public void FinishGesture(ElementViewModel element)
+    {
+        if (_historial.Last is not { Value: var ultimo } || ultimo.Element != element || ultimo.WasDeleted)
+            return;
+
+        if (ultimo.Bounds.Equals(element.Element.Bounds))
+        {
+            _historial.RemoveLast();
+            NotificarHistorial();
+        }
+    }
 
     [RelayCommand(CanExecute = nameof(CanUndo))]
     private void Undo()
     {
-        // La restauración real se implementa en la fase 7.
-        if (_historial.Count == 0)
+        if (_historial.Last is not { Value: var snapshot })
             return;
 
-        _historial.Pop();
+        _historial.RemoveLast();
+
+        if (snapshot.WasDeleted)
+        {
+            // Se reinserta donde estaba, no al final: si el usuario tenía varios elementos,
+            // que reaparezca en otro orden resulta desconcertante.
+            var posicion = Math.Clamp(snapshot.Index, 0, Elements.Count);
+            Elements.Insert(posicion, snapshot.Element);
+            RefreshVisibleElements();
+            Select(snapshot.Element);
+        }
+        else
+        {
+            snapshot.Element.Element.Bounds = snapshot.Bounds;
+            snapshot.Element.NotifyGeometryChanged();
+            Select(snapshot.Element);
+        }
+
+        Status = $"Deshecho: {snapshot.Descripcion}.";
+        NotificarHistorial();
+    }
+
+    private void NotificarHistorial()
+    {
         OnPropertyChanged(nameof(CanUndo));
         UndoCommand.NotifyCanExecuteChanged();
     }
