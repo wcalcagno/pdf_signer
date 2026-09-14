@@ -165,11 +165,6 @@ jobs:
   ios:
     name: iOS (solo compilación)
     runs-on: macos-latest
-    # No bloquea el workflow. El runner no trae ningun runtime de simulador compatible con
-    # el SDK del Xcode que exige .NET para iOS 26.0, y actool falla por eso incluso
-    # compilando para dispositivo. Es una limitacion del entorno, no del codigo: el mismo
-    # rasterizador de CoreGraphics compila sin problemas en el trabajo de macCatalyst.
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v7

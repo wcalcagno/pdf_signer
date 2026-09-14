@@ -60,9 +60,9 @@ entre plataformas y este proyecto se ha desarrollado en una máquina Windows:
 | **Windows** | ✅ Probado en uso real | Se ha usado de principio a fin sobre documentos reales de varias páginas: abrir, colocar la firma, arrastrarla, redimensionarla por las esquinas, deshacer, guardar favorita, navegar entre páginas y exportar. El instalador se ha instalado, ejecutado y desinstalado sin dejar restos. |
 | **Android** | 🟡 Compila | Se genera el APK en CI, pero **nadie lo ha ejecutado en un dispositivo**. |
 | **macOS** | 🟡 Compila | Se genera el `.app` en CI, pero **nadie lo ha ejecutado**. |
-| **iOS** | ⚠️ Sin compilar | No por el código: el runner de CI no tiene ningún runtime de simulador compatible con el Xcode que exige .NET para iOS 26, y `actool` falla antes de terminar. El mismo rasterizador de CoreGraphics **sí compila** en el trabajo de macOS, que comparte ese archivo. |
+| **iOS** | 🟡 Compila | Compila para dispositivo en CI, pero **no hay paquete descargable**: distribuir en iOS exige una cuenta de desarrollador de Apple de pago. Para probarlo en un iPhone hace falta un Mac con Xcode y tu Apple ID. |
 
-Que algo compile no significa que funcione. En Android y macOS está verificado que el
+Que algo compile no significa que funcione. En Android, macOS e iOS está verificado que el
 código es válido y que se empaqueta, nada más: la interacción real —abrir un PDF, arrastrar
 la firma, exportar— no la ha probado nadie todavía.
 
