@@ -72,34 +72,31 @@ public sealed partial class ElementViewModel : ObservableObject
         NotifyGeometryChanged();
     }
 
-    /// <summary>Desplaza el elemento. Los incrementos llegan en píxeles de la página sin escalar.</summary>
+    /// <summary>Desplaza el elemento. Los incrementos llegan en píxeles de pantalla.</summary>
     public void Move(double deltaX, double deltaY)
     {
         if (_canvasWidth <= 0 || _canvasHeight <= 0)
             return;
 
-        var b = Element.Bounds;
-        Element.Bounds = new NormalizedRect(
-            b.X + deltaX / _canvasWidth,
-            b.Y + deltaY / _canvasHeight,
-            b.Width,
-            b.Height).Clamped();
-
+        Element.Bounds = Element.Bounds.Moved(deltaX / _canvasWidth, deltaY / _canvasHeight);
         NotifyGeometryChanged();
     }
 
-    /// <summary>Redimensiona desde la esquina inferior derecha, conservando la superior izquierda.</summary>
-    public void Resize(double deltaX, double deltaY)
+    /// <summary>Redimensiona arrastrando una esquina; la opuesta se queda donde está.</summary>
+    /// <remarks>
+    /// La aritmética está en NormalizedRect, dentro del núcleo, donde sí hay pruebas. Aquí
+    /// solo se convierten píxeles de pantalla a proporción del lienzo.
+    ///
+    /// El mismo código sirve para ratón y para dedo: un arrastre es un arrastre, sin ninguna
+    /// rama por plataforma.
+    /// </remarks>
+    public void Resize(ResizeCorner corner, double deltaX, double deltaY)
     {
         if (_canvasWidth <= 0 || _canvasHeight <= 0)
             return;
 
-        var b = Element.Bounds;
-        Element.Bounds = new NormalizedRect(
-            b.X,
-            b.Y,
-            Math.Max(MinimumNormalizedSize, b.Width + deltaX / _canvasWidth),
-            Math.Max(MinimumNormalizedSize, b.Height + deltaY / _canvasHeight)).Clamped();
+        Element.Bounds = Element.Bounds.Resized(
+            corner, deltaX / _canvasWidth, deltaY / _canvasHeight, MinimumNormalizedSize);
 
         NotifyGeometryChanged();
     }

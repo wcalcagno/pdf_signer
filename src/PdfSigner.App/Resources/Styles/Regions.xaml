@@ -62,6 +62,29 @@
                 Value="{AppThemeBinding Light={StaticResource FondoNavegador}, Dark={StaticResource FondoNavegadorOscuro}}" />
     </Style>
 
+    <!--
+        Área táctil del asa de redimensionado. Es un cuadrado transparente de 44x44, la
+        medida mínima que recomiendan tanto Apple como Google para un objetivo de dedo,
+        mientras que el círculo visible dentro mide 18: se toca cómodo sin ensuciar la vista.
+
+        Hace falta BackgroundColor="Transparent" y no dejarlo sin fondo: un contenedor sin
+        color no recibe toques.
+    -->
+    <Style x:Key="AreaAsa" TargetType="Grid">
+        <Setter Property="WidthRequest" Value="{StaticResource LadoAreaTactil}" />
+        <Setter Property="HeightRequest" Value="{StaticResource LadoAreaTactil}" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+    </Style>
+
+    <Style x:Key="PuntoAsa" TargetType="BoxView">
+        <Setter Property="WidthRequest" Value="18" />
+        <Setter Property="HeightRequest" Value="18" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Color" Value="{StaticResource Acento}" />
+        <Setter Property="HorizontalOptions" Value="Center" />
+        <Setter Property="VerticalOptions" Value="Center" />
+    </Style>
+
     <Style x:Key="EtiquetaSeccion" TargetType="Label">
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontAttributes" Value="Bold" />

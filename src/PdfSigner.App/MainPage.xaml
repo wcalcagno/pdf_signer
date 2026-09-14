@@ -105,45 +105,94 @@
                         <Grid BindableLayout.ItemsSource="{Binding VisibleElements}">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ElementViewModel">
-                                    <Border Margin="{Binding Position}"
-                                            WidthRequest="{Binding Width}"
-                                            HeightRequest="{Binding Height}"
-                                            HorizontalOptions="Start"
-                                            VerticalOptions="Start"
-                                            BackgroundColor="Transparent"
-                                            Stroke="{Binding OutlineColor}"
-                                            StrokeThickness="{Binding OutlineThickness}">
+                                    <!--
+                                        Las asas cuelgan de este Grid y no del Border interior
+                                        porque sobresalen de los bordes del elemento con
+                                        márgenes negativos, y dentro del Border quedarían
+                                        recortadas.
+                                    -->
+                                    <Grid Margin="{Binding Position}"
+                                          WidthRequest="{Binding Width}"
+                                          HeightRequest="{Binding Height}"
+                                          HorizontalOptions="Start"
+                                          VerticalOptions="Start">
 
-                                        <Border.GestureRecognizers>
-                                            <PanGestureRecognizer PanUpdated="OnElementPan" />
-                                            <TapGestureRecognizer Tapped="OnElementTapped" />
-                                        </Border.GestureRecognizers>
+                                        <Border BackgroundColor="Transparent"
+                                                Stroke="{Binding OutlineColor}"
+                                                StrokeThickness="{Binding OutlineThickness}">
 
-                                        <Grid>
-                                            <Image Source="{Binding Preview}"
-                                                   Aspect="Fill"
-                                                   IsVisible="{Binding IsImage}" />
+                                            <Border.GestureRecognizers>
+                                                <PanGestureRecognizer PanUpdated="OnElementPan" />
+                                                <TapGestureRecognizer Tapped="OnElementTapped" />
+                                            </Border.GestureRecognizers>
 
-                                            <Label Text="{Binding DisplayText}"
-                                                   FontSize="{Binding FontSize}"
-                                                   TextColor="{Binding TextColor}"
-                                                   IsVisible="{Binding IsText}"
-                                                   LineBreakMode="WordWrap" />
+                                            <Grid>
+                                                <Image Source="{Binding Preview}"
+                                                       Aspect="Fill"
+                                                       IsVisible="{Binding IsImage}" />
 
-                                            <!-- Fase 5 sustituye esta asa única por cuatro,
-                                                 una por esquina y con área táctil ampliada. -->
-                                            <BoxView WidthRequest="22" HeightRequest="22"
-                                                     CornerRadius="11"
-                                                     Color="{StaticResource Acento}"
-                                                     HorizontalOptions="End" VerticalOptions="End"
-                                                     Margin="0,0,-11,-11"
-                                                     IsVisible="{Binding IsSelected}">
-                                                <BoxView.GestureRecognizers>
-                                                    <PanGestureRecognizer PanUpdated="OnHandlePan" />
-                                                </BoxView.GestureRecognizers>
-                                            </BoxView>
+                                                <Label Text="{Binding DisplayText}"
+                                                       FontSize="{Binding FontSize}"
+                                                       TextColor="{Binding TextColor}"
+                                                       IsVisible="{Binding IsText}"
+                                                       LineBreakMode="WordWrap" />
+                                            </Grid>
+                                        </Border>
+
+                                        <!--
+                                            Una asa por esquina. ClassId identifica cuál es:
+                                            dentro de una plantilla no se puede usar x:Name, y
+                                            los gestos de MAUI no admiten parámetro, así que el
+                                            manejador lo lee de ahí.
+
+                                            El margen de -22 centra el área táctil de 44 sobre
+                                            la esquina, de modo que se puede agarrar tanto por
+                                            dentro como por fuera del elemento.
+                                        -->
+                                        <Grid ClassId="TopLeft"
+                                              Style="{StaticResource AreaAsa}"
+                                              IsVisible="{Binding IsSelected}"
+                                              HorizontalOptions="Start" VerticalOptions="Start"
+                                              Margin="-22,-22,0,0">
+                                            <Grid.GestureRecognizers>
+                                                <PanGestureRecognizer PanUpdated="OnHandlePan" />
+                                            </Grid.GestureRecognizers>
+                                            <BoxView Style="{StaticResource PuntoAsa}" />
                                         </Grid>
-                                    </Border>
+
+                                        <Grid ClassId="TopRight"
+                                              Style="{StaticResource AreaAsa}"
+                                              IsVisible="{Binding IsSelected}"
+                                              HorizontalOptions="End" VerticalOptions="Start"
+                                              Margin="0,-22,-22,0">
+                                            <Grid.GestureRecognizers>
+                                                <PanGestureRecognizer PanUpdated="OnHandlePan" />
+                                            </Grid.GestureRecognizers>
+                                            <BoxView Style="{StaticResource PuntoAsa}" />
+                                        </Grid>
+
+                                        <Grid ClassId="BottomLeft"
+                                              Style="{StaticResource AreaAsa}"
+                                              IsVisible="{Binding IsSelected}"
+                                              HorizontalOptions="Start" VerticalOptions="End"
+                                              Margin="-22,0,0,-22">
+                                            <Grid.GestureRecognizers>
+                                                <PanGestureRecognizer PanUpdated="OnHandlePan" />
+                                            </Grid.GestureRecognizers>
+                                            <BoxView Style="{StaticResource PuntoAsa}" />
+                                        </Grid>
+
+                                        <Grid ClassId="BottomRight"
+                                              Style="{StaticResource AreaAsa}"
+                                              IsVisible="{Binding IsSelected}"
+                                              HorizontalOptions="End" VerticalOptions="End"
+                                              Margin="0,0,-22,-22">
+                                            <Grid.GestureRecognizers>
+                                                <PanGestureRecognizer PanUpdated="OnHandlePan" />
+                                            </Grid.GestureRecognizers>
+                                            <BoxView Style="{StaticResource PuntoAsa}" />
+                                        </Grid>
+                                    </Grid>
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
                         </Grid>

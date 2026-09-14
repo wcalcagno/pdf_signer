@@ -22,6 +22,81 @@ public readonly record struct NormalizedRect(double X, double Y, double Width, d
             Math.Clamp(Y, 0, 1 - h),
             w, h);
     }
+
+    /// <summary>Desplaza el rectángulo, sin salirse de la página.</summary>
+    public NormalizedRect Moved(double deltaX, double deltaY) =>
+        new NormalizedRect(X + deltaX, Y + deltaY, Width, Height).Clamped();
+
+    /// <summary>
+    /// Redimensiona arrastrando una esquina; la opuesta se queda donde está.
+    /// </summary>
+    /// <remarks>
+    /// Esto vive en el núcleo y no en la interfaz a propósito. Es aritmética que puede fallar
+    /// en silencio —el rectángulo se invierte, el elemento salta al otro lado del cursor— y la
+    /// interfaz no tiene pruebas automáticas, mientras que aquí sí.
+    /// </remarks>
+    /// <param name="minimo">Tamaño mínimo, en proporción de página.</param>
+    public NormalizedRect Resized(ResizeCorner corner, double deltaX, double deltaY, double minimo = 0.02)
+    {
+        double x = X, y = Y, w = Width, h = Height;
+
+        // Arrastrar un borde izquierdo o superior mueve el origen además de cambiar el
+        // tamaño; los bordes derecho e inferior solo cambian el tamaño.
+        switch (corner)
+        {
+            case ResizeCorner.BottomRight:
+                w += deltaX;
+                h += deltaY;
+                break;
+
+            case ResizeCorner.BottomLeft:
+                x += deltaX;
+                w -= deltaX;
+                h += deltaY;
+                break;
+
+            case ResizeCorner.TopRight:
+                y += deltaY;
+                h -= deltaY;
+                w += deltaX;
+                break;
+
+            case ResizeCorner.TopLeft:
+                x += deltaX;
+                w -= deltaX;
+                y += deltaY;
+                h -= deltaY;
+                break;
+        }
+
+        // Al llegar al mínimo el borde arrastrado se detiene en lugar de cruzar al otro lado.
+        // Sin esto, seguir arrastrando daría la vuelta al rectángulo y el elemento saltaría
+        // al lado contrario del cursor.
+        if (w < minimo)
+        {
+            if (corner is ResizeCorner.TopLeft or ResizeCorner.BottomLeft)
+                x = X + Width - minimo;
+            w = minimo;
+        }
+
+        if (h < minimo)
+        {
+            if (corner is ResizeCorner.TopLeft or ResizeCorner.TopRight)
+                y = Y + Height - minimo;
+            h = minimo;
+        }
+
+        return new NormalizedRect(x, y, w, h).Clamped();
+    }
+}
+
+/// <summary>Esquina por la que se arrastra al redimensionar un elemento.</summary>
+public enum ResizeCorner
+{
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
 }
 
 /// <summary>Elemento colocado sobre una página concreta del documento.</summary>

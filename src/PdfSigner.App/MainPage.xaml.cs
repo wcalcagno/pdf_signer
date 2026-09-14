@@ -1,3 +1,4 @@
+using PdfSigner.Core;
 using PdfSigner.App.ViewModels;
 
 namespace PdfSigner.App;
@@ -183,11 +184,14 @@ public partial class MainPage : ContentPage
         if (Resolve(sender) is not { } vm)
             return;
 
+        var esquina = LeerEsquina(sender);
+
         switch (e.StatusType)
         {
             case GestureStatus.Started:
                 _lastPanX = 0;
                 _lastPanY = 0;
+                _vm.Select(vm);
                 break;
 
             case GestureStatus.Running:
@@ -195,10 +199,26 @@ public partial class MainPage : ContentPage
                 var dy = e.TotalY - _lastPanY;
                 _lastPanX = e.TotalX;
                 _lastPanY = e.TotalY;
-                vm.Resize(dx, dy);
+                vm.Resize(esquina, dx, dy);
                 break;
         }
     }
+
+    /// <summary>
+    /// Averigua qué esquina se está arrastrando a partir del ClassId del asa.
+    /// </summary>
+    /// <remarks>
+    /// Dentro de una plantilla no se puede usar x:Name, y los reconocedores de gestos de MAUI
+    /// no admiten parámetros. ClassId es la vía más directa para distinguir cuatro controles
+    /// idénticos sin montar cuatro manejadores casi iguales.
+    /// </remarks>
+    private static ResizeCorner LeerEsquina(object? sender) => (sender as Element)?.ClassId switch
+    {
+        "TopLeft" => ResizeCorner.TopLeft,
+        "TopRight" => ResizeCorner.TopRight,
+        "BottomLeft" => ResizeCorner.BottomLeft,
+        _ => ResizeCorner.BottomRight,
+    };
 
     private void OnPagePinch(object? sender, PinchGestureUpdatedEventArgs e)
     {
