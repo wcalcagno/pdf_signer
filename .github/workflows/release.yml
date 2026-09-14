@@ -178,16 +178,31 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Se usa el Xcode POR DEFECTO del runner, no una version antigua concreta.
+      # Hacen falta TRES versiones alineadas, y el runner no las alinea solo:
       #
-      # El intento anterior seleccionaba Xcode 26.0 porque .NET para iOS lo exigia, pero esa
-      # instalacion del runner esta incompleta: sus runtimes de simulador no casan con su
-      # propio SDK y actool moria con "No simulator runtime version available". El Xcode por
-      # defecto si esta completo, asi que en vez de bajar el Xcode se sube el workload.
+      #   1. el Xcode seleccionado
+      #   2. el Microsoft.iOS.Sdk que instala el workload
+      #   3. un runtime de simulador de iOS instalado
+      #
+      # El runner trae catorce Xcodes (26.0 a 26.6) pero solo tres runtimes de simulador:
+      # iOS 26.2, 26.4 y 26.5. Con el Xcode por defecto (26.6) no hay runtime, y con el 26.0
+      # que pedia el workload sin actualizar, tampoco. La version util es la 26.5, que es la
+      # mas alta con runtime disponible y la que trae dotnet workload update.
       - name: Preparar Xcode
         run: |
           ls /Applications | grep -i '^Xcode' || true
-          sudo xcode-select -s /Applications/Xcode.app
+          elegido=""
+          for v in 26.5 26.4 26.2; do
+            if [ -d "/Applications/Xcode_$v.app" ]; then
+              elegido="/Applications/Xcode_$v.app"
+              break
+            fi
+          done
+          if [ -z "$elegido" ]; then
+            echo "Ningun Xcode con runtime de simulador conocido"; exit 1
+          fi
+          echo "Usando $elegido"
+          sudo xcode-select -s "$elegido"
           xcodebuild -version
           echo "--- runtimes de simulador disponibles ---"
           xcrun simctl list runtimes || true
