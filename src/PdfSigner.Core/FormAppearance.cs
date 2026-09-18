@@ -109,6 +109,18 @@ internal static class FormAppearance
                 Math.Abs(rect.Elements.GetReal(3) - rect.Elements.GetReal(1)));
     }
 
+    /// <summary>
+    /// Tamaño de letra con el que se va a escribir este campo, en puntos.
+    /// </summary>
+    /// <remarks>
+    /// Lo usa la interfaz para dibujar la vista previa del campo con el MISMO tamaño que va a
+    /// tener en el PDF exportado. Calcularlo por separado en la aplicación llevaría a que lo
+    /// que se ve en pantalla y lo que se guarda no coincidieran en cuanto una de las dos
+    /// reglas cambiara.
+    /// </remarks>
+    public static double TamanoDeLetra(PdfDictionary widget, PdfAcroForm form, double altoPt) =>
+        LeerApariencia(widget, form, altoPt).Tamano;
+
     /// <summary>Lee fuente, tamaño y color del <c>/DA</c> del campo o, si no tiene, del formulario.</summary>
     private static (string Fuente, double Tamano, string Color) LeerApariencia(
         PdfDictionary widget, PdfAcroForm form, double alto)

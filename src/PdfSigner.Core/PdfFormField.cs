@@ -37,7 +37,12 @@ public enum PdfFormFieldKind
 /// <param name="OptionName">
 /// Para un grupo de radio, el valor que representa esta opción concreta. Null en el resto.
 /// </param>
-public sealed record PdfFormWidget(int PageIndex, NormalizedRect Bounds, string? OptionName = null);
+/// <param name="HeightPt">
+/// Alto de la zona en puntos PDF. Permite a la interfaz saber cuántos píxeles de pantalla
+/// vale un punto sin tener que conocer el tamaño de la página.
+/// </param>
+public sealed record PdfFormWidget(
+    int PageIndex, NormalizedRect Bounds, string? OptionName = null, double HeightPt = 0);
 
 /// <summary>Un campo de formulario leído de un PDF.</summary>
 /// <remarks>
@@ -69,6 +74,15 @@ public sealed class PdfFormField
 
     /// <summary>Longitud máxima en campos de texto, o 0 si no hay límite.</summary>
     public int MaxLength { get; init; }
+
+    /// <summary>
+    /// Tamaño de letra en puntos con el que se escribirá el valor.
+    /// </summary>
+    /// <remarks>
+    /// Ya resuelto: si el campo pedía tamaño automático, aquí viene el que se va a usar de
+    /// verdad. Así la vista previa puede dibujar el texto exactamente como va a quedar.
+    /// </remarks>
+    public double FontSizePt { get; init; }
 
     /// <summary>El campo de texto admite varias líneas.</summary>
     public bool MultiLine { get; init; }

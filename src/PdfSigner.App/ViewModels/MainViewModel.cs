@@ -24,6 +24,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IFileExporter _exporter;
     private readonly FavoriteSignatureStore _favorites;
     private readonly PdfSignatureService _signer = new();
+    private readonly PdfFormService _forms = new();
 
     private byte[]? _pdfBytes;
     private string _sourceFileName = "documento.pdf";
@@ -72,6 +73,17 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Solo los elementos anclados a la página que se está viendo.</summary>
     public ObservableCollection<ElementViewModel> VisibleElements { get; } = [];
 
+    /// <summary>Zonas rellenables del formulario, de todas las páginas.</summary>
+    /// <remarks>
+    /// Hay una por WIDGET y no por campo: un grupo de radio ocupa varios sitios en la página
+    /// y cada opción necesita su propia caja.
+    /// </remarks>
+    public ObservableCollection<FormFieldViewModel> FormFields { get; } = [];
+
+    public ObservableCollection<FormFieldViewModel> VisibleFormFields { get; } = [];
+
+    public bool HasForm => FormFields.Count > 0;
+
     public bool HasDocument => _pdfBytes is { Length: > 0 };
 
     public bool HasFavorite => _favorites.Load() is { IsEmpty: false };
@@ -100,6 +112,8 @@ public sealed partial class MainViewModel : ObservableObject
 
             Elements.Clear();
             VisibleElements.Clear();
+            FormFields.Clear();
+            VisibleFormFields.Clear();
             Pages.Clear();
 
             // El historial apunta a elementos del documento anterior: deshacer sobre el nuevo
@@ -112,12 +126,16 @@ public sealed partial class MainViewModel : ObservableObject
             for (var i = 0; i < geometry.Count; i++)
                 Pages.Add(new PageViewModel(i));
 
+            CargarFormulario();
+
             CurrentPageIndex = 0;
             await ShowPageAsync(0);
             OnPropertyChanged(nameof(HasDocument));
             OnPropertyChanged(nameof(HasNoDocument));
 
-            Status = $"{Pages.Count} página(s). Añade una firma o un texto.";
+            Status = HasForm
+                ? $"{Pages.Count} página(s) y {ContarCampos()} campo(s) rellenables."
+                : $"{Pages.Count} página(s). Añade una firma o un texto.";
         });
 
         // Las miniaturas se generan después de mostrar la página, para que la app responda
@@ -136,11 +154,17 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     public async Task LoadDemoAsync()
     {
-        _pdfBytes = Services.DemoContent.CrearPdf();
-        _sourceFileName = "contrato-ejemplo.pdf";
+        var esFormulario = Services.DemoContent.EsFormulario;
+
+        _pdfBytes = esFormulario
+            ? Services.DemoContent.CrearFormularioPdf()
+            : Services.DemoContent.CrearPdf();
+        _sourceFileName = esFormulario ? "solicitud-ejemplo.pdf" : "contrato-ejemplo.pdf";
 
         Elements.Clear();
         VisibleElements.Clear();
+        FormFields.Clear();
+        VisibleFormFields.Clear();
         Pages.Clear();
 
         using (var probe = new MemoryStream(_pdfBytes))
@@ -149,10 +173,46 @@ public sealed partial class MainViewModel : ObservableObject
                 Pages.Add(new PageViewModel(i));
         }
 
+        CargarFormulario();
+
         CurrentPageIndex = 0;
         await ShowPageAsync(0);
         OnPropertyChanged(nameof(HasDocument));
         OnPropertyChanged(nameof(HasNoDocument));
+
+        if (esFormulario)
+        {
+            if (Services.DemoContent.RellenarDemo)
+            {
+                Escribir("nombre", "Walter E. Calcagno");
+                Escribir("observaciones", "Solicita plaza en el turno indicado.\nSegunda línea de prueba.");
+                Escribir("turno", "Tarde");
+                Pulsar("acepto");
+
+                // Se marca primero "si" y luego "no" a propósito: si las zonas de un grupo no
+                // compartieran el campo, quedarían las dos encendidas y se vería en la captura.
+                Pulsar("asistira", "si");
+                Pulsar("asistira", "no");
+            }
+
+            Status = $"Formulario de ejemplo: {ContarCampos()} campos (modo demo).";
+            _ = GenerateThumbnailsAsync();
+            return;
+        }
+
+        void Escribir(string campo, string valor)
+        {
+            if (FormFields.FirstOrDefault(f => f.Name == campo) is { } zona)
+                zona.Value = valor;
+        }
+
+        void Pulsar(string campo, string? opcion = null)
+        {
+            var zona = FormFields.FirstOrDefault(
+                f => f.Name == campo && (opcion is null || f.OptionName == opcion));
+
+            zona?.Toggle();
+        }
 
         AddImageElement(Services.DemoContent.CrearFirma());
         Register(new ElementViewModel(new TextElement
@@ -183,6 +243,64 @@ public sealed partial class MainViewModel : ObservableObject
         _ = GenerateThumbnailsAsync();
     }
 #endif
+
+    // ------------------------------------------------------------ formulario
+
+    /// <summary>Lee los campos del documento recién abierto.</summary>
+    /// <remarks>
+    /// Un formulario que no se pueda interpretar NO impide trabajar con el documento: se puede
+    /// seguir firmándolo a mano, que es para lo que nació esta aplicación. Por eso el fallo se
+    /// avisa en la barra de estado en vez de cortar la apertura.
+    /// </remarks>
+    private void CargarFormulario()
+    {
+        if (_pdfBytes is null)
+            return;
+
+        try
+        {
+            using var probe = new MemoryStream(_pdfBytes);
+
+            foreach (var campo in _forms.Read(probe).Where(c => c.IsEditable))
+            {
+                foreach (var zona in campo.Widgets)
+                    FormFields.Add(new FormFieldViewModel(campo, zona, SincronizarCampo));
+            }
+        }
+        catch (Exception ex)
+        {
+            FormFields.Clear();
+            Status = $"El documento tiene un formulario que no se pudo leer: {ex.Message}";
+        }
+
+        OnPropertyChanged(nameof(HasForm));
+    }
+
+    /// <summary>Número de campos distintos, que no de zonas.</summary>
+    private int ContarCampos() => FormFields.Select(f => f.Name).Distinct().Count();
+
+    /// <summary>
+    /// Refresca las demás zonas del campo que acaba de cambiar.
+    /// </summary>
+    /// <remarks>
+    /// Hace falta para los grupos de radio: al marcar una opción, las otras tienen que dejar
+    /// de verse marcadas. Comparten el mismo objeto de campo, así que su valor ya es correcto;
+    /// lo único que les falta es enterarse para volver a dibujarse.
+    /// </remarks>
+    private void SincronizarCampo(FormFieldViewModel cambiado)
+    {
+        foreach (var otra in FormFields)
+        {
+            if (otra != cambiado && otra.Name == cambiado.Name)
+                otra.NotifyValueChanged();
+        }
+    }
+
+    /// <summary>Valores a escribir, uno por campo aunque tenga varias zonas.</summary>
+    private Dictionary<string, string?> ValoresDelFormulario() =>
+        FormFields
+            .GroupBy(f => f.Name)
+            .ToDictionary(g => g.Key, g => g.First().Value);
 
     // ------------------------------------------------------------- elementos
 
@@ -673,7 +791,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ExportAsync()
     {
-        if (_pdfBytes is null || Elements.Count == 0)
+        if (_pdfBytes is null || (Elements.Count == 0 && !HasForm))
         {
             Status = "Añade al menos una firma antes de exportar.";
             return;
@@ -681,12 +799,28 @@ public sealed partial class MainViewModel : ObservableObject
 
         await RunBusyAsync("Generando el PDF firmado...", async () =>
         {
-            using var input = new MemoryStream(_pdfBytes);
             using var output = new MemoryStream();
+
+            var valores = ValoresDelFormulario();
+            var elementos = Elements.Select(e => e.Element).ToList();
+            var origen = _pdfBytes;
 
             // El trabajo pesado va a un hilo de fondo: en un PDF grande bloquearía la interfaz.
             await Task.Run(() =>
-                _signer.Sign(input, output, Elements.Select(e => e.Element)));
+            {
+                using var entrada = new MemoryStream(origen);
+                using var intermedio = new MemoryStream();
+
+                // Se rellena primero y se firma encima. Al revés daría el mismo resultado pero
+                // obligaría a abrir y guardar el documento una vez más.
+                if (valores.Count > 0)
+                    _forms.Fill(entrada, intermedio, valores);
+                else
+                    entrada.CopyTo(intermedio);
+
+                intermedio.Position = 0;
+                _signer.Sign(intermedio, output, elementos);
+            });
 
             var name = $"{Path.GetFileNameWithoutExtension(_sourceFileName)}-firmado.pdf";
             var delivered = await _exporter.ExportAsync(name, output.ToArray());
@@ -781,6 +915,14 @@ public sealed partial class MainViewModel : ObservableObject
             element.SetCanvasSize(DisplayWidth, DisplayHeight);
             VisibleElements.Add(element);
         }
+
+        VisibleFormFields.Clear();
+
+        foreach (var campo in FormFields.Where(f => f.PageIndex == CurrentPageIndex))
+        {
+            campo.SetCanvasSize(DisplayWidth, DisplayHeight);
+            VisibleFormFields.Add(campo);
+        }
     }
 
     // ---- Tamaño con el que se DIBUJA la página ----
@@ -840,6 +982,9 @@ public sealed partial class MainViewModel : ObservableObject
         // el tamaño ya ampliado. Gracias a eso los gestos no necesitan dividir por el zoom.
         foreach (var element in Elements)
             element.SetCanvasSize(DisplayWidth, DisplayHeight);
+
+        foreach (var campo in FormFields)
+            campo.SetCanvasSize(DisplayWidth, DisplayHeight);
     }
 
     private async Task RunBusyAsync(string message, Func<Task> work)

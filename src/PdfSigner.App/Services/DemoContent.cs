@@ -34,9 +34,176 @@ internal static class DemoContent
     /// </remarks>
     public static bool SimularArrastre => Modo == "drag";
 
-    /// <summary>Modo del arnés: "1", "drag", "moved" o "undo".</summary>
+    /// <summary>Modo del arnés: "1", "drag", "moved", "undo" o "form".</summary>
     public static string Modo =>
         Environment.GetEnvironmentVariable(VariableEntorno)?.ToLowerInvariant() ?? string.Empty;
+
+    /// <summary>Con PDFSIGNER_DEMO=form o formlleno se carga un formulario en vez del contrato.</summary>
+    public static bool EsFormulario => Modo is "form" or "formlleno";
+
+    /// <summary>
+    /// Con PDFSIGNER_DEMO=formlleno el formulario arranca con todos los campos escritos.
+    /// </summary>
+    /// <remarks>
+    /// Una captura no puede teclear ni pulsar, así que sin esto no habria forma de comprobar
+    /// con la vista que marcar una opcion apaga las demas del grupo, que es justo la parte
+    /// que depende de que varias zonas compartan el mismo objeto de campo.
+    /// </remarks>
+    public static bool RellenarDemo => Modo == "formlleno";
+
+    /// <summary>
+    /// Formulario de una página con los cinco tipos de campo.
+    /// </summary>
+    /// <remarks>
+    /// Se monta a mano con diccionarios porque PDFsharp sabe leer y rellenar formularios pero
+    /// no crearlos. Duplica en parte lo que hace el generador de las pruebas, y es a propósito:
+    /// aquél sirve para afirmar sobre estructuras, éste para poder MIRAR la pantalla. Juntarlos
+    /// obligaría a que el núcleo expusiera un constructor de formularios que la aplicación no
+    /// necesita para nada.
+    /// </remarks>
+    public static byte[] CrearFormularioPdf()
+    {
+        EmbeddedFontResolver.Register();
+
+        var doc = new PdfDocument();
+        var page = doc.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+
+        PdfDictionary Dic()
+        {
+            var d = new PdfDictionary(doc);
+            doc.Internals.AddObject(d);
+            return d;
+        }
+
+        PdfArray Rect(double x, double y, double w, double h) =>
+            new(doc, new PdfReal(x), new PdfReal(y), new PdfReal(x + w), new PdfReal(y + h));
+
+        PdfDictionary Base(string nombre, string tipo, PdfArray rect)
+        {
+            var d = Dic();
+            d.Elements["/Type"] = new PdfName("/Annot");
+            d.Elements["/Subtype"] = new PdfName("/Widget");
+            d.Elements["/FT"] = new PdfName(tipo);
+            d.Elements["/T"] = new PdfString(nombre);
+            d.Elements["/Rect"] = rect;
+            d.Elements["/F"] = new PdfInteger(4);
+            d.Elements["/DA"] = new PdfString("/Helv 10 Tf 0 g");
+            d.Elements["/P"] = page.Reference!;
+            return d;
+        }
+
+        // Los rótulos van dibujados en la página, como en un formulario de verdad: el nombre
+        // interno del campo solo se ve como pista dentro de la caja vacía.
+        using (var g = XGraphics.FromPdfPage(page))
+        {
+            var titulo = new XFont("Open Sans", 14, XFontStyleEx.Bold);
+            var texto = new XFont("Open Sans", 10);
+
+            g.DrawString("SOLICITUD DE INSCRIPCION", titulo, XBrushes.DimGray, new XPoint(60, 70));
+
+            foreach (var (etiqueta, y) in new[]
+            {
+                ("Nombre completo", 130.0), ("Observaciones", 180.0), ("Acepto las condiciones", 265.0),
+                ("Asistira", 300.0), ("Turno preferido", 340.0),
+            })
+            {
+                g.DrawString(etiqueta, texto, XBrushes.Black, new XPoint(60, y));
+            }
+
+            g.DrawString("Si", texto, XBrushes.Black, new XPoint(198, 305));
+            g.DrawString("No", texto, XBrushes.Black, new XPoint(258, 305));
+        }
+
+        var nombre = Base("nombre", "/Tx", Rect(200, 725, 230, 20));
+        var observaciones = Base("observaciones", "/Tx", Rect(200, 640, 230, 55));
+        observaciones.Elements["/Ff"] = new PdfInteger(4096);   // multilínea
+
+        var acepto = Base("acepto", "/Btn", Rect(200, 568, 16, 16));
+        acepto.Elements["/AS"] = new PdfName("/Off");
+        acepto.Elements["/AP"] = Apariencias(doc, ["Off", "Yes"]);
+
+        var asistira = Dic();
+        asistira.Elements["/FT"] = new PdfName("/Btn");
+        asistira.Elements["/T"] = new PdfString("asistira");
+        asistira.Elements["/Ff"] = new PdfInteger(32768 | 16384);   // radio, sin apagar
+        asistira.Elements["/V"] = new PdfName("/Off");
+
+        var opciones = new PdfArray(doc);
+        foreach (var (valor, x) in new[] { ("si", 180.0), ("no", 240.0) })
+        {
+            var k = Dic();
+            k.Elements["/Type"] = new PdfName("/Annot");
+            k.Elements["/Subtype"] = new PdfName("/Widget");
+            k.Elements["/Rect"] = Rect(x, 533, 16, 16);
+            k.Elements["/F"] = new PdfInteger(4);
+            k.Elements["/AS"] = new PdfName("/Off");
+            k.Elements["/Parent"] = asistira.Reference!;
+            k.Elements["/P"] = page.Reference!;
+            k.Elements["/AP"] = Apariencias(doc, ["Off", valor]);
+            opciones.Elements.Add(k.Reference!);
+        }
+
+        doc.Internals.AddObject(opciones);
+        asistira.Elements["/Kids"] = opciones.Reference!;
+
+        var turno = Base("turno", "/Ch", Rect(200, 493, 150, 20));
+        turno.Elements["/Ff"] = new PdfInteger(131072);   // desplegable
+        var opt = new PdfArray(doc,
+            new PdfString("Mañana"), new PdfString("Tarde"), new PdfString("Indiferente"));
+        doc.Internals.AddObject(opt);
+        turno.Elements["/Opt"] = opt.Reference!;
+
+        var campos = new List<PdfDictionary> { nombre, observaciones, acepto, asistira, turno };
+
+        var annots = new PdfArray(doc, [
+            nombre.Reference!, observaciones.Reference!, acepto.Reference!,
+            opciones.Elements[0], opciones.Elements[1], turno.Reference!,
+        ]);
+        doc.Internals.AddObject(annots);
+        page.Elements["/Annots"] = annots.Reference!;
+
+        var lista = new PdfArray(doc, [.. campos.Select(c => (PdfItem)c.Reference!)]);
+        doc.Internals.AddObject(lista);
+
+        var acro = Dic();
+        acro.Elements["/Fields"] = lista.Reference!;
+        acro.Elements["/DA"] = new PdfString("/Helv 10 Tf 0 g");
+        doc.Internals.Catalog.Elements["/AcroForm"] = acro.Reference!;
+
+        var ms = new MemoryStream();
+        doc.Save(ms, closeStream: false);
+        doc.Close();
+        return ms.ToArray();
+    }
+
+    /// <summary>Diccionario /AP con una apariencia por estado.</summary>
+    /// <remarks>
+    /// /AP y /N tienen que ser diccionarios DIRECTOS: con objetos indirectos PDFsharp no
+    /// encuentra los estados al releer el documento.
+    /// </remarks>
+    private static PdfDictionary Apariencias(PdfDocument doc, string[] estados)
+    {
+        var n = new PdfDictionary(doc);
+
+        foreach (var estado in estados)
+        {
+            var xo = new PdfDictionary(doc);
+            doc.Internals.AddObject(xo);
+            xo.Elements["/Type"] = new PdfName("/XObject");
+            xo.Elements["/Subtype"] = new PdfName("/Form");
+            xo.Elements["/BBox"] = new PdfArray(doc,
+                new PdfReal(0), new PdfReal(0), new PdfReal(16), new PdfReal(16));
+            xo.CreateStream(Encoding.ASCII.GetBytes(estado == "Off"
+                ? "0.6 w 0 G 1 1 14 14 re S"
+                : "0.6 w 0 G 1 1 14 14 re S 0 g 4 4 8 8 re f"));
+            n.Elements["/" + estado] = xo.Reference!;
+        }
+
+        var ap = new PdfDictionary(doc);
+        ap.Elements["/N"] = n;
+        return ap;
+    }
 
     /// <summary>Documento de dos páginas con aspecto de contrato.</summary>
     public static byte[] CrearPdf()

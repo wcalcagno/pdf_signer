@@ -37,6 +37,20 @@
     <Color x:Key="Acento">#0A84FF</Color>
     <Color x:Key="TextoTenue">#8E8E93</Color>
 
+    <!-- Campos de formulario.
+
+         El realce es translúcido a propósito: la caja tiene que verse sobre el documento sin
+         tapar lo que haya impreso debajo, que muchas veces es la línea o el recuadro que el
+         propio formulario dibuja para ese campo. Un fondo opaco lo ocultaría y el usuario
+         perdería la referencia de dónde termina el hueco.
+
+         El azul es el mismo tono que usan los lectores de PDF habituales para lo rellenable,
+         así que no hay que explicar qué significa. No se atenúa en modo oscuro porque va
+         encima de la página, que es blanca en los dos temas. -->
+    <Color x:Key="RealceCampo">#2E0A84FF</Color>
+    <Color x:Key="BordeCampo">#800A84FF</Color>
+    <Color x:Key="TintaCampo">#1C1C1E</Color>
+
     <Style x:Key="RegionBarra" TargetType="Grid">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Light={StaticResource FondoBarra}, Dark={StaticResource FondoBarraOscuro}}" />

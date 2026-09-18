@@ -20,6 +20,170 @@
              Title="PdfSigner">
 
     <!--
+        Plantillas de las zonas rellenables del formulario.
+
+        Todas comparten la misma forma de colocarse: margen para la posición y tamaño pedido,
+        anclados arriba a la izquierda. Es el mismo mecanismo que usan las firmas, y por el
+        mismo motivo: el posicionamiento proporcional de AbsoluteLayout tiene en cuenta el
+        tamaño del propio control, así que no cuadraría con el PDF exportado.
+
+        El realce de fondo es deliberado. Un campo de formulario vacío es invisible sobre la
+        página —en el papel lo marca una línea impresa, aquí no hay nada— y sin él el usuario
+        no tendría forma de saber que el documento se puede rellenar.
+    -->
+    <ContentPage.Resources>
+
+        <!--
+            Cada campo de escritura tiene DOS caras: una etiqueta que muestra el valor y el
+            control nativo, que solo aparece al tocarlo.
+
+            No es un capricho. En Windows, un Entry mas bajo de unos 24 pixeles pinta su fondo
+            pero no su texto, y con la pagina ajustada a la ventana un campo de 20 puntos mide
+            quince. El formulario se veia vacio aunque los valores estuvieran puestos, que es
+            la peor forma de fallar: no hay error, solo un documento en blanco. Una etiqueta
+            se encoge a la medida real del campo sin dejar de verse.
+        -->
+        <DataTemplate x:Key="CampoTexto" x:DataType="vm:FormFieldViewModel">
+            <Grid Margin="{Binding Position}"
+                  WidthRequest="{Binding Width}"
+                  HeightRequest="{Binding Height}"
+                  HorizontalOptions="Start"
+                  VerticalOptions="Start">
+
+                <Border IsVisible="{Binding IsNotEditing}"
+                        Padding="2,0"
+                        StrokeThickness="0"
+                        BackgroundColor="{StaticResource RealceCampo}"
+                        SemanticProperties.Description="{Binding Placeholder}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnFormFieldEdit" />
+                    </Border.GestureRecognizers>
+                    <Label Text="{Binding DisplayText}"
+                           FontSize="{Binding FontSize}"
+                           TextColor="{Binding DisplayColor}"
+                           LineBreakMode="TailTruncation"
+                           VerticalOptions="Center" />
+                </Border>
+
+                <Entry IsVisible="{Binding IsEditing}"
+                       Text="{Binding Text, Mode=TwoWay}"
+                       Placeholder="{Binding Placeholder}"
+                       FontSize="{Binding FontSize}"
+                       TextColor="{StaticResource TintaCampo}"
+                       PlaceholderColor="{StaticResource TextoTenue}"
+                       HeightRequest="{Binding EditHeight}"
+                       MinimumHeightRequest="0"
+                       VerticalOptions="Start"
+                       BackgroundColor="{StaticResource RealceCampo}"
+                       Unfocused="OnFormFieldEditDone" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="CampoMultilinea" x:DataType="vm:FormFieldViewModel">
+            <Grid Margin="{Binding Position}"
+                  WidthRequest="{Binding Width}"
+                  HeightRequest="{Binding Height}"
+                  HorizontalOptions="Start"
+                  VerticalOptions="Start">
+
+                <Border IsVisible="{Binding IsNotEditing}"
+                        Padding="2,0"
+                        StrokeThickness="0"
+                        BackgroundColor="{StaticResource RealceCampo}"
+                        SemanticProperties.Description="{Binding Placeholder}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnFormFieldEdit" />
+                    </Border.GestureRecognizers>
+                    <Label Text="{Binding DisplayText}"
+                           FontSize="{Binding FontSize}"
+                           TextColor="{Binding DisplayColor}"
+                           LineBreakMode="WordWrap"
+                           VerticalOptions="Start" />
+                </Border>
+
+                <Editor IsVisible="{Binding IsEditing}"
+                        Text="{Binding Text, Mode=TwoWay}"
+                        Placeholder="{Binding Placeholder}"
+                        FontSize="{Binding FontSize}"
+                        TextColor="{StaticResource TintaCampo}"
+                        PlaceholderColor="{StaticResource TextoTenue}"
+                        HeightRequest="{Binding EditHeight}"
+                        MinimumHeightRequest="0"
+                        AutoSize="Disabled"
+                        VerticalOptions="Start"
+                        BackgroundColor="{StaticResource RealceCampo}"
+                        Unfocused="OnFormFieldEditDone" />
+            </Grid>
+        </DataTemplate>
+
+        <!--
+            Casillas y radios se dibujan a mano en vez de usar CheckBox y RadioButton de MAUI.
+            Esos controles traen su propio tamaño fijo y no se pueden encoger hasta la medida
+            real del campo, que en un formulario suele ser de unos pocos milímetros: saldrían
+            desbordados sobre el texto de alrededor. Un Border con su marca dentro sí escala.
+        -->
+        <DataTemplate x:Key="CampoBoton" x:DataType="vm:FormFieldViewModel">
+            <Border Margin="{Binding Position}"
+                    WidthRequest="{Binding Width}"
+                    HeightRequest="{Binding Height}"
+                    HorizontalOptions="Start"
+                    VerticalOptions="Start"
+                    Padding="0"
+                    StrokeThickness="1"
+                    Stroke="{StaticResource BordeCampo}"
+                    BackgroundColor="{StaticResource RealceCampo}"
+                    SemanticProperties.Description="{Binding Placeholder}">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnFormFieldToggled" />
+                </Border.GestureRecognizers>
+                <Label Text="{Binding Glyph}"
+                       FontSize="{Binding GlyphSize}"
+                       TextColor="{StaticResource TintaCampo}"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center" />
+            </Border>
+        </DataTemplate>
+
+        <!--
+            El desplegable tambien se dibuja a mano y al tocarlo se abre una hoja de opciones.
+
+            Se probo antes con el Picker de MAUI y no muestra la opcion elegida: se le asigne
+            por SelectedItem o por SelectedIndex, y tanto desde el enlace como desde codigo al
+            cargarse, el control sigue enseñando su titulo. Ademas obliga a darle un alto
+            minimo mayor que el del campo para que se le vea el texto. La hoja de opciones es
+            ademas mas usable en un campo de pocos milimetros, donde una lista desplegable
+            nativa resulta imposible de acertar con el dedo.
+        -->
+        <DataTemplate x:Key="CampoEleccion" x:DataType="vm:FormFieldViewModel">
+            <Border Margin="{Binding Position}"
+                    WidthRequest="{Binding Width}"
+                    HeightRequest="{Binding Height}"
+                    HorizontalOptions="Start"
+                    VerticalOptions="Start"
+                    Padding="2,0"
+                    StrokeThickness="1"
+                    Stroke="{StaticResource BordeCampo}"
+                    BackgroundColor="{StaticResource RealceCampo}"
+                    SemanticProperties.Description="{Binding Placeholder}">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnFormChoiceTapped" />
+                </Border.GestureRecognizers>
+                <Label Text="{Binding DisplayText}"
+                       FontSize="{Binding FontSize}"
+                       TextColor="{Binding DisplayColor}"
+                       LineBreakMode="TailTruncation"
+                       VerticalOptions="Center" />
+            </Border>
+        </DataTemplate>
+
+        <views:FormFieldTemplateSelector x:Key="SelectorDeCampo"
+                                         Texto="{StaticResource CampoTexto}"
+                                         Multilinea="{StaticResource CampoMultilinea}"
+                                         Boton="{StaticResource CampoBoton}"
+                                         Eleccion="{StaticResource CampoEleccion}" />
+    </ContentPage.Resources>
+
+    <!--
         Aquí se declara la disposición de ESCRITORIO: 3 filas y 2 columnas, con el inspector
         en la columna derecha. La variante de móvil la aplica el code-behind.
 
@@ -101,6 +265,15 @@
                           VerticalOptions="Center">
 
                         <Image Source="{Binding CurrentPageImage}" Aspect="Fill" />
+
+                        <!--
+                            Los campos del formulario van DEBAJO de las firmas. Forman parte
+                            del documento, mientras que una firma se estampa encima; si una
+                            firma acaba sobre un campo, el gesto tiene que ir a la firma, que
+                            es lo que el usuario está moviendo.
+                        -->
+                        <Grid BindableLayout.ItemsSource="{Binding VisibleFormFields}"
+                              BindableLayout.ItemTemplateSelector="{StaticResource SelectorDeCampo}" />
 
                         <Grid BindableLayout.ItemsSource="{Binding VisibleElements}">
                             <BindableLayout.ItemTemplate>

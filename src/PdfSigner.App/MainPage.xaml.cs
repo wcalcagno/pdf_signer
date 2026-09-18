@@ -268,6 +268,72 @@ public partial class MainPage : ContentPage
             await _vm.GoToPageCommand.ExecuteAsync(page);
     }
 
+    /// <summary>Abre un campo de escritura y pone el cursor dentro.</summary>
+    /// <remarks>
+    /// El control nativo solo existe mientras se está escribiendo. Enfocarlo se aplaza al
+    /// siguiente ciclo del despachador porque en este instante todavía está oculto, y un
+    /// control invisible no acepta el foco: el usuario tendría que tocar dos veces.
+    /// </remarks>
+    private void OnFormFieldEdit(object? sender, TappedEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is not FormFieldViewModel campo)
+            return;
+
+        campo.IsEditing = true;
+
+        if ((sender as Element)?.Parent is Grid contenedor)
+        {
+            var entrada = contenedor.Children.OfType<InputView>().FirstOrDefault();
+            Dispatcher.Dispatch(() => entrada?.Focus());
+        }
+    }
+
+    /// <summary>Ofrece las opciones de un desplegable o de una lista.</summary>
+    /// <remarks>
+    /// Una hoja de opciones en vez del Picker de MAUI, que no llega a mostrar la opción
+    /// elegida ni asignándosela desde código una vez cargado. Además funciona igual de bien
+    /// sobre un campo de pocos milímetros, que es donde una lista nativa se vuelve imposible
+    /// de acertar.
+    /// </remarks>
+    private async void OnFormChoiceTapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is not FormFieldViewModel campo)
+            return;
+
+        if (campo.Options.Count == 0)
+            return;
+
+        const string vaciar = "(dejar en blanco)";
+        var elegido = await DisplayActionSheetAsync(
+            campo.Placeholder, "Cancelar", vaciar, [.. campo.Options]);
+
+        if (elegido is null || elegido == "Cancelar")
+            return;
+
+        campo.Value = elegido == vaciar ? null : elegido;
+    }
+
+    /// <summary>Cierra el campo al salir de él y deja solo la etiqueta.</summary>
+    private void OnFormFieldEditDone(object? sender, FocusEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is FormFieldViewModel campo)
+            campo.IsEditing = false;
+    }
+
+    /// <summary>
+    /// Marca o desmarca una casilla o una opción de un grupo de radio.
+    /// </summary>
+    /// <remarks>
+    /// Los campos de texto y los desplegables se editan solos a través de su enlace de datos;
+    /// estos dos no tienen control propio que lo haga, porque están dibujados a mano para
+    /// poder encogerse al tamaño real del campo.
+    /// </remarks>
+    private void OnFormFieldToggled(object? sender, TappedEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is FormFieldViewModel campo)
+            campo.Toggle();
+    }
+
     /// <summary>
     /// Obtiene el elemento al que pertenece el gesto. Dentro de una plantilla, el
     /// BindingContext del control es siempre su propio ViewModel.

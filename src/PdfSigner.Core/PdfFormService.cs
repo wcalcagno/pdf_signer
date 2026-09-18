@@ -67,7 +67,7 @@ public sealed class PdfFormService
                 continue;
 
             var tipo = Clasificar(campo);
-            var widgets = LeerWidgets(campo, tipo, geometrias, paginaDeAnotacion);
+            var widgets = LeerWidgets(campo, tipo, form, geometrias, paginaDeAnotacion);
 
             // Un campo sin ninguna zona dibujable no se puede mostrar ni tocar. Ocurre con
             // campos ocultos o heredados de plantillas; se omiten en vez de aparecer como
@@ -85,6 +85,7 @@ public sealed class PdfFormService
                 ReadOnly = campo.ReadOnly,
                 MaxLength = campo is PdfTextField t ? t.MaxLength : 0,
                 MultiLine = campo is PdfTextField m && m.MultiLine,
+                FontSizePt = LeerTamanoDeLetra(campo, form, widgets),
             });
         }
 
@@ -326,6 +327,7 @@ public sealed class PdfFormService
     private static IReadOnlyList<PdfFormWidget> LeerWidgets(
         PdfAcroField campo,
         PdfFormFieldKind tipo,
+        PdfAcroForm form,
         IReadOnlyList<PageGeometry> geometrias,
         IReadOnlyDictionary<PdfObjectID, int> paginaDeAnotacion)
     {
@@ -348,7 +350,7 @@ public sealed class PdfFormService
             // distinta de /Off. Es el dato que hará falta para marcar la correcta.
             var opcion = tipo == PdfFormFieldKind.RadioGroup ? LeerNombreDeOpcion(fuente) : null;
 
-            widgets.Add(new PdfFormWidget(pagina, bounds, opcion));
+            widgets.Add(new PdfFormWidget(pagina, bounds, opcion, Math.Abs(y2 - y1)));
         }
 
         return widgets;
@@ -443,6 +445,17 @@ public sealed class PdfFormService
             return porP;
 
         return -1;
+    }
+
+    /// <summary>Tamaño de letra del campo, preguntándoselo a quien lo va a dibujar.</summary>
+    private static double LeerTamanoDeLetra(
+        PdfAcroField campo, PdfAcroForm form, IReadOnlyList<PdfFormWidget> widgets)
+    {
+        if (widgets.Count == 0)
+            return 0;
+
+        var zona = FuentesDeWidget(campo).FirstOrDefault() ?? campo;
+        return FormAppearance.TamanoDeLetra(zona, form, widgets[0].HeightPt);
     }
 
     // --------------------------------------------------------- valor y opciones
