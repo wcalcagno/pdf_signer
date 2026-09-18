@@ -169,6 +169,12 @@ dotnet test tests/PdfSigner.Core.Tests/PdfSigner.Core.Tests.csproj
 5. **Deshacer** (↶) retrocede el último movimiento, cambio de tamaño o borrado.
 6. **Exportar**: diálogo de guardado en escritorio, hoja de compartir en móvil.
 
+Para acercarte están los botones **− / +** de la barra inferior y **Ajustar**, que devuelve
+la página entera a la ventana. En escritorio funciona además **Ctrl + rueda del ratón**, que
+amplía hacia donde tengas el puntero; en pantalla táctil, el pellizco de siempre. Acercarse
+hace falta sobre todo para rellenar formularios: un campo corriente mide unos pocos
+milímetros y con la página entera en pantalla no se puede trabajar en él.
+
 Al seleccionar un elemento aparecen sus propiedades: en escritorio, en una columna fija a
 la derecha; en móvil, en un panel que sube desde abajo. Sobre la página flota además una
 barra con las acciones que dependen de lo seleccionado.
