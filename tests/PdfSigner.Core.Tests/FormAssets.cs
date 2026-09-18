@@ -1,7 +1,6 @@
 using System.Text;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
-using PdfSharp.Pdf.Advanced;
 
 namespace PdfSigner.Core.Tests;
 
@@ -16,8 +15,12 @@ namespace PdfSigner.Core.Tests;
 ///
 /// La rotación y el origen del MediaBox son parámetros a propósito: son las dos trampas que
 /// puede tener la conversión de coordenadas, y hay que poder provocarlas.
+///
+/// El documento en construcción vive en campos de INSTANCIA, no estáticos. Con estáticos, dos
+/// clases de prueba generando formularios a la vez se pisan el documento a medio montar y los
+/// fallos salen luego al leer, disfrazados de "PDF dañado".
 /// </remarks>
-internal static class FormAssets
+internal sealed class FormAssets
 {
     public const double AnchoPt = 595;
     public const double AltoPt = 842;
@@ -25,21 +28,27 @@ internal static class FormAssets
     /// <summary>Rectángulo PDF del campo de texto principal, para poder afirmar sobre él.</summary>
     public static readonly (double X1, double Y1, double X2, double Y2) RectTexto = (100, 700, 300, 720);
 
-    private static PdfDocument _doc = null!;
-    private static PdfPage _page = null!;
+    private readonly PdfDocument _doc = new();
+    private readonly PdfPage _page;
 
-    public static MemoryStream CrearFormulario(
-        int rotacion = 0, double origenX = 0, double origenY = 0)
+    private FormAssets(int rotacion, double origenX, double origenY)
     {
-        EmbeddedFontResolver.Register();
-
-        _doc = new PdfDocument();
         _page = _doc.AddPage();
         _page.MediaBox = new PdfRectangle(
             new XPoint(origenX, origenY),
             new XPoint(origenX + AnchoPt, origenY + AltoPt));
         _page.Rotate = rotacion;
+    }
 
+    public static MemoryStream CrearFormulario(
+        int rotacion = 0, double origenX = 0, double origenY = 0)
+    {
+        EmbeddedFontResolver.Register();
+        return new FormAssets(rotacion, origenX, origenY).Montar(origenX, origenY);
+    }
+
+    private MemoryStream Montar(double origenX, double origenY)
+    {
         var helv = Dic();
         helv.Elements["/Type"] = new PdfName("/Font");
         helv.Elements["/Subtype"] = new PdfName("/Type1");
@@ -115,17 +124,17 @@ internal static class FormAssets
         return Enumerable.Range(0, kids.Elements.Count).Select(i => kids.Elements[i]);
     }
 
-    private static PdfDictionary Dic()
+    private PdfDictionary Dic()
     {
         var d = new PdfDictionary(_doc);
         _doc.Internals.AddObject(d);
         return d;
     }
 
-    private static PdfArray Rect(double x, double y, double w, double h) =>
+    private PdfArray Rect(double x, double y, double w, double h) =>
         new(_doc, new PdfReal(x), new PdfReal(y), new PdfReal(x + w), new PdfReal(y + h));
 
-    private static PdfDictionary Texto(
+    private PdfDictionary Texto(
         string nombre, double x, double y, double w, double h,
         int maxLength = 0, bool multilinea = false, bool soloLectura = false)
     {
@@ -151,7 +160,7 @@ internal static class FormAssets
         return d;
     }
 
-    private static PdfDictionary Apariencia(string contenido)
+    private PdfDictionary Apariencia(string contenido)
     {
         var xo = Dic();
         xo.Elements["/Type"] = new PdfName("/XObject");
@@ -162,7 +171,7 @@ internal static class FormAssets
         return xo;
     }
 
-    private static PdfDictionary Casilla(string nombre, double x, double y)
+    private PdfDictionary Casilla(string nombre, double x, double y)
     {
         var d = Dic();
         d.Elements["/Type"] = new PdfName("/Annot");
@@ -185,7 +194,7 @@ internal static class FormAssets
         return d;
     }
 
-    private static PdfDictionary Radio(string nombre, (string valor, double x, double y)[] opciones)
+    private PdfDictionary Radio(string nombre, (string valor, double x, double y)[] opciones)
     {
         var padre = Dic();
         padre.Elements["/FT"] = new PdfName("/Btn");
@@ -221,7 +230,7 @@ internal static class FormAssets
         return padre;
     }
 
-    private static PdfDictionary Eleccion(
+    private PdfDictionary Eleccion(
         string nombre, double x, double y, double w, double h, bool combo, string[] opciones)
     {
         var d = Dic();
