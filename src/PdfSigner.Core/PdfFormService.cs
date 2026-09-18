@@ -102,14 +102,18 @@ public sealed class PdfFormService
     /// la opción. Los campos de solo lectura y los de firma se ignoran, de modo que se pueda
     /// devolver el mapa completo que dio <see cref="Read"/> sin filtrarlo.
     /// </param>
+    /// <param name="flatten">
+    /// Si es true, los campos se convierten en contenido fijo de la página y desaparecen del
+    /// documento: lo que se ve queda igual pero ya no se puede modificar.
+    /// </param>
     /// <remarks>
-    /// Los campos siguen siendo editables: rellenar no bloquea nada. Fijarlos es cosa del
-    /// aplanado, que va aparte porque el usuario decide si quiere o no.
+    /// Sin aplanar, los campos siguen siendo editables: rellenar no bloquea nada.
     /// </remarks>
     public void Fill(
         Stream input,
         Stream output,
         IReadOnlyDictionary<string, string?> values,
+        bool flatten = false,
         bool compress = true)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -148,10 +152,24 @@ public sealed class PdfFormService
             }
         }
 
+        if (flatten)
+            FormFlattener.Aplanar(doc);
+
         doc.Options.CompressContentStreams = compress;
         doc.Options.NoCompression = !compress;
         doc.Save(output, closeStream: false);
     }
+
+    /// <summary>
+    /// Fija los campos tal y como están: pasa lo que se ve al contenido de la página y
+    /// elimina el formulario.
+    /// </summary>
+    /// <remarks>
+    /// Un documento ya aplanado no tiene campos, así que volver a aplanarlo no hace nada; y
+    /// uno que nunca tuvo formulario sale igual que entró.
+    /// </remarks>
+    public void Flatten(Stream input, Stream output, bool compress = true) =>
+        Fill(input, output, new Dictionary<string, string?>(), flatten: true, compress);
 
     private static void Rellenar(PdfAcroForm form, PdfAcroField campo, PdfFormFieldKind tipo, string? valor)
     {

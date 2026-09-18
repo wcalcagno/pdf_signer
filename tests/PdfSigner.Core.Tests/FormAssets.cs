@@ -41,13 +41,17 @@ internal sealed class FormAssets
     }
 
     public static MemoryStream CrearFormulario(
-        int rotacion = 0, double origenX = 0, double origenY = 0)
+        int rotacion = 0, double origenX = 0, double origenY = 0,
+        bool recursosEnElPadre = false, bool conEnlace = false, bool conCampoOculto = false)
     {
         EmbeddedFontResolver.Register();
-        return new FormAssets(rotacion, origenX, origenY).Montar(origenX, origenY);
+        return new FormAssets(rotacion, origenX, origenY)
+            .Montar(origenX, origenY, recursosEnElPadre, conEnlace, conCampoOculto);
     }
 
-    private MemoryStream Montar(double origenX, double origenY)
+    private MemoryStream Montar(
+        double origenX, double origenY,
+        bool recursosEnElPadre, bool conEnlace, bool conCampoOculto)
     {
         var helv = Dic();
         helv.Elements["/Type"] = new PdfName("/Font");
@@ -70,7 +74,28 @@ internal sealed class FormAssets
             Eleccion("turno", X(100), Y(400), 150, 50, combo: false, ["Mañana", "Tarde"]),
         };
 
-        var annots = new PdfArray(_doc, campos.SelectMany(Widgets).ToArray());
+        if (conCampoOculto)
+        {
+            var escondido = Texto("secreto", X(100), Y(350), 200, 20);
+            escondido.Elements["/F"] = new PdfInteger(2);   // bit 2 = oculto
+            escondido.Elements["/V"] = new PdfString("no deberia verse");
+            campos.Add(escondido);
+        }
+
+        var anotaciones = campos.SelectMany(Widgets).ToList();
+
+        if (conEnlace)
+        {
+            var enlace = Dic();
+            enlace.Elements["/Type"] = new PdfName("/Annot");
+            enlace.Elements["/Subtype"] = new PdfName("/Link");
+            enlace.Elements["/Rect"] = Rect(X(400), Y(750), 100, 20);
+            enlace.Elements["/Border"] = new PdfArray(_doc,
+                new PdfInteger(0), new PdfInteger(0), new PdfInteger(0));
+            anotaciones.Add(enlace.Reference!);
+        }
+
+        var annots = new PdfArray(_doc, [.. anotaciones]);
         _doc.Internals.AddObject(annots);
         _page.Elements["/Annots"] = annots.Reference!;
 
@@ -87,6 +112,19 @@ internal sealed class FormAssets
         acro.Elements["/DA"] = new PdfString("/Helv 10 Tf 0 g");
         acro.Elements["/DR"] = recursos;
         _doc.Internals.Catalog.Elements["/AcroForm"] = acro.Reference!;
+
+        // /Resources es heredable. Colgarlos del nodo padre, y no de la página, reproduce los
+        // documentos que comparten recursos entre páginas: si algo los sustituye por unos
+        // vacíos, el contenido original se queda sin fuentes.
+        if (recursosEnElPadre && _page.Elements.GetDictionary("/Parent") is { } padre)
+        {
+            var heredados = Dic();
+            var suyas = Dic();
+            suyas.Elements["/Marca"] = helv.Reference!;
+            heredados.Elements["/Font"] = suyas.Reference!;
+            padre.Elements["/Resources"] = heredados.Reference!;
+            _page.Elements.Remove("/Resources");
+        }
 
         var ms = new MemoryStream();
         _doc.Save(ms, closeStream: false);
