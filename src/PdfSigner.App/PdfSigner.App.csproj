@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFrameworks>net10.0-android</TargetFrameworks>
@@ -34,8 +34,8 @@
 		<ApplicationId>io.github.wcalcagno.pdfsigner</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.1.1</ApplicationDisplayVersion>
-		<ApplicationVersion>3</ApplicationVersion>
+		<ApplicationDisplayVersion>1.1.2</ApplicationDisplayVersion>
+		<ApplicationVersion>4</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
@@ -76,8 +76,8 @@
 	</ItemGroup>
 
 	<!-- Nota: el rasterizador de CoreGraphics vive en Platforms\iOS y sirve igual para
-	     macCatalyst. NO hay que incluirlo a mano aquí: MAUI ya compila Platforms\iOS cuando
-	     el target es macCatalyst, y añadirlo explícitamente provoca NETSDK1022 por elementos
+	     macCatalyst. NO hay que incluirlo a mano aquÃ­: MAUI ya compila Platforms\iOS cuando
+	     el target es macCatalyst, y aÃ±adirlo explÃ­citamente provoca NETSDK1022 por elementos
 	     Compile duplicados. -->
 
 </Project>
