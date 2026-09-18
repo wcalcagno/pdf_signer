@@ -260,6 +260,18 @@ jobs:
             Aplicación libre para firmar PDFs colocando una imagen de firma y un bloque de
             texto sobre la página. Es firma **visual**, no criptográfica.
 
+            ## Novedad en 1.1: formularios
+
+            Si el PDF trae campos de formulario, ahora se muestran resaltados sobre la página
+            y se pueden rellenar antes de firmar: texto de una o varias líneas, casillas,
+            grupos de opciones, desplegables y listas. La casilla **Bloquear campos al
+            exportar**, activada de partida, entrega el PDF con lo escrito ya fijado y sin
+            formulario, de modo que nadie pueda cambiar las respuestas después.
+
+            Aviso: los formularios de prueba son de fabricación propia. **Todavía no se ha
+            probado con archivos reales de Acrobat o LibreOffice**, que pueden traer
+            estructuras que aquí no se reproducen.
+
             ## Qué descargar
 
             | Sistema | Archivo | Nota |
