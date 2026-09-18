@@ -363,11 +363,21 @@ public sealed partial class MainViewModel : ObservableObject
         {
             PageIndex = CurrentPageIndex,
             Bounds = new NormalizedRect(0.12, 0.78, 0.45, 0.10),
-            Text = "Nombre y apellidos\nCargo\nFirmado el {fecha}",
+
+            // Nace vacio y no con un texto de ejemplo. El ejemplo habia que borrarlo antes
+            // de escribir, y seleccionarlo entero al abrir el editor para que se sustituyera
+            // al teclear no funciona: en Windows, SelectionLength del Editor de MAUI no se
+            // aplica y el texto nuevo acababa pegado al final del de ejemplo. Vacio no hay
+            // nada que deshacer, y para la firma de siempre esta "Usar favorita".
+            Text = string.Empty,
         };
 
-        Register(new ElementViewModel(element));
-        Status = "Toca el bloque para editarlo. {fecha} se sustituye al exportar.";
+        // Nace abierto para escribir: lo que se acaba de pedir es un sitio donde teclear, y
+        // obligar a un segundo toque para conseguirlo es hacerselo buscar.
+        var vm = new ElementViewModel(element) { IsEditing = true };
+
+        Register(vm);
+        Status = "Escribe y toca fuera para terminar. {fecha} se sustituye al exportar.";
     }
 
     [RelayCommand]

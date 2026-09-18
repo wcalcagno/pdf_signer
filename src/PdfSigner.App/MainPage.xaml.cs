@@ -151,11 +151,68 @@ public partial class MainPage : ContentPage
 
     private bool _viewportConocido;
 
+    /// <summary>
+    /// Primer toque selecciona; el segundo, sobre un bloque ya seleccionado, abre la edición.
+    /// </summary>
+    /// <remarks>
+    /// Dos pasos y no uno porque el primer toque también sirve para agarrar el bloque y
+    /// moverlo: si tocar abriera directamente el teclado, colocar la firma sería un suplicio
+    /// en pantalla táctil. Es el mismo gesto que usa cualquier editor para renombrar algo.
+    /// </remarks>
     private void OnElementTapped(object? sender, TappedEventArgs e)
     {
-        if (Resolve(sender) is { } vm)
-            _vm.Select(vm);
+        if (Resolve(sender) is not { } vm)
+            return;
+
+        if (vm.IsText && vm.IsSelected)
+        {
+            EditarBloque(vm, sender);
+            return;
+        }
+
+        _vm.Select(vm);
     }
+
+    private void EditarBloque(ElementViewModel vm, object? origen)
+    {
+        vm.IsEditing = true;
+
+        if ((origen as Border)?.Content is not Grid contenido)
+            return;
+
+        var editor = contenido.Children.OfType<Editor>().FirstOrDefault();
+
+        if (editor is not null)
+            Enfocar(editor);
+    }
+
+    /// <summary>Pone el cursor en un bloque que nace ya abierto para escribir.</summary>
+    /// <remarks>
+    /// Es el caso de "Anadir texto": el bloque aparece y hay que poder teclear en el acto. El
+    /// editor no existe hasta que la plantilla se despliega, asi que el foco se pide aqui y no
+    /// al crearlo.
+    /// </remarks>
+    private void OnElementEditorLoaded(object? sender, EventArgs e)
+    {
+        if (sender is Editor editor && Resolve(editor) is { IsEditing: true })
+            Enfocar(editor);
+    }
+
+    /// <summary>Pide el foco en el siguiente ciclo del despachador.</summary>
+    /// <remarks>
+    /// Aplazado porque en el momento de la llamada el editor todavia esta oculto, y un control
+    /// invisible no acepta el foco: sin esto haria falta tocar dos veces.
+    /// </remarks>
+    private void Enfocar(Editor editor) => Dispatcher.Dispatch(() => editor.Focus());
+
+    private void OnElementEditDone(object? sender, FocusEventArgs e)
+    {
+        if (Resolve(sender) is { } vm)
+            vm.IsEditing = false;
+    }
+
+    /// <summary>Tocar el fondo suelta la selección y con ella la barra flotante.</summary>
+    private void OnCanvasTapped(object? sender, TappedEventArgs e) => _vm.Select(null);
 
     private void OnElementPan(object? sender, PanUpdatedEventArgs e)
     {

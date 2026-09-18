@@ -274,9 +274,29 @@
               Style="{StaticResource RegionCanvas}"
               SizeChanged="OnCanvasResized">
 
+            <!-- El gris de alrededor tambien deselecciona: para quien mira, todo lo que no
+                 sea la firma es "fuera". -->
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnCanvasTapped" />
+            </Grid.GestureRecognizers>
+
             <!-- Capa 1: la página, con desplazamiento y zoom. -->
             <ScrollView x:Name="CanvasScroll" Orientation="Both">
-                <Grid Padding="24" HorizontalOptions="Center" VerticalOptions="Center">
+                <!--
+                    El toque en el fondo deselecciona. Sin esto, la barra flotante se queda
+                    sobre el documento tapando texto hasta que se elige otra cosa, y lo que
+                    hace cualquiera para quitarla es pinchar fuera.
+
+                    Va en este contenedor y no en el de la pagina para que valga tambien el
+                    margen gris de alrededor.
+                -->
+                <Grid Padding="24"
+                      HorizontalOptions="Center"
+                      VerticalOptions="Center"
+                      BackgroundColor="Transparent">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnCanvasTapped" />
+                    </Grid.GestureRecognizers>
                     <!--
                         El zoom cambia el TAMAÑO de la página, no su Scale. Scale no afecta al
                         layout: el hueco seguiría midiendo lo original, el ScrollView calcularía
@@ -348,8 +368,33 @@
                                                 <Label Text="{Binding DisplayText}"
                                                        FontSize="{Binding FontSize}"
                                                        TextColor="{Binding TextColor}"
-                                                       IsVisible="{Binding IsText}"
+                                                       IsVisible="{Binding IsNotEditing}"
                                                        LineBreakMode="WordWrap" />
+
+                                                <!--
+                                                    Se escribe sobre la propia pagina. El
+                                                    editor solo existe mientras se escribe:
+                                                    tenerlo siempre puesto se comeria el
+                                                    gesto de arrastrar el bloque.
+
+                                                    Muestra el texto CRUDO, con {fecha} sin
+                                                    resolver, que es lo que hay que poder
+                                                    corregir; la etiqueta de al lado es la
+                                                    que enseña como va a quedar.
+                                                -->
+                                                <Editor IsVisible="{Binding IsEditing}"
+                                                        Text="{Binding Text, Mode=TwoWay}"
+                                                        Placeholder="Escribe aquí"
+                                                        PlaceholderColor="{StaticResource TextoTenue}"
+                                                        FontSize="{Binding FontSize}"
+                                                        TextColor="{Binding TextColor}"
+                                                        HeightRequest="{Binding EditHeight}"
+                                                        MinimumHeightRequest="0"
+                                                        AutoSize="Disabled"
+                                                        VerticalOptions="Start"
+                                                        BackgroundColor="{StaticResource RealceCampo}"
+                                                        Loaded="OnElementEditorLoaded"
+                                                        Unfocused="OnElementEditDone" />
                                             </Grid>
                                         </Border>
 

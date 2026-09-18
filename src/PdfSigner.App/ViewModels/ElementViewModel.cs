@@ -135,11 +135,13 @@ public sealed partial class ElementViewModel : ObservableObject
         OnPropertyChanged(nameof(HitPosition));
         OnPropertyChanged(nameof(HitWidth));
         OnPropertyChanged(nameof(HitHeight));
+        OnPropertyChanged(nameof(EditHeight));
     }
 
     public void NotifyTextChanged()
     {
         OnPropertyChanged(nameof(DisplayText));
+        OnPropertyChanged(nameof(IsEmptyText));
         OnPropertyChanged(nameof(FontSize));
         OnPropertyChanged(nameof(TextColor));
     }
@@ -196,13 +198,58 @@ public sealed partial class ElementViewModel : ObservableObject
     /// El elemento conserva el <c>{fecha}</c> sin resolver; la sustitución de verdad ocurre al
     /// exportar. Aquí se resuelve únicamente para que el usuario vea cómo va a quedar.
     /// </remarks>
-    public string DisplayText =>
-        AsText is { } t ? PlaceholderResolver.Resolve(t.Text, DateTime.Now) : string.Empty;
+    public string DisplayText => AsText is not { } t
+        ? string.Empty
+        : string.IsNullOrWhiteSpace(t.Text)
+            ? PistaVacia
+            : PlaceholderResolver.Resolve(t.Text, DateTime.Now);
+
+    /// <summary>Lo que se lee en un bloque todavía sin escribir.</summary>
+    /// <remarks>
+    /// Un bloque vacío no se dibuja, y sin esto se quedaría invisible sobre la página en
+    /// cuanto se deselecciona: existiría, ocuparía sitio y no habría forma de volver a
+    /// encontrarlo. No se exporta: el texto en blanco no genera contenido en el PDF.
+    /// </remarks>
+    public const string PistaVacia = "Escribe aquí";
+
+    public bool IsEmptyText => IsText && string.IsNullOrWhiteSpace(AsText?.Text);
 
     public double FontSize => AsText?.FontSizePt ?? 11;
 
-    public Color TextColor =>
-        AsText is { } t && Color.TryParse(t.ColorHex, out var color) ? color : Colors.Black;
+    // ---- Edicion sobre la propia pagina ----
+
+    /// <summary>El bloque esta abierto para escribir en el.</summary>
+    /// <remarks>
+    /// Editar en el inspector obliga a mirar a otro sitio mientras se escribe, y eso importa
+    /// cuando lo que se escribe tiene que caer encima de una linea impresa del documento. En
+    /// la pagina se ve al momento si el texto cabe y si esta a la altura correcta.
+    /// </remarks>
+    [ObservableProperty]
+    public partial bool IsEditing { get; set; }
+
+    public bool IsNotEditing => !IsEditing;
+
+    /// <summary>Alto que se le pide al editor mientras se escribe.</summary>
+    /// <remarks>
+    /// Un bloque recien puesto puede ser mas bajo de lo que el control nativo necesita para
+    /// dibujar su texto, sobre todo con la pagina alejada. Se agranda solo mientras se edita;
+    /// el bloque de verdad conserva su tamaño.
+    /// </remarks>
+    public double EditHeight => Math.Max(Height, 44);
+
+    partial void OnIsEditingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsNotEditing));
+
+        // Escribir y arrastrar a la vez no tiene sentido, y el arrastre dejaria el bloque
+        // agrandado mientras se teclea.
+        if (value)
+            IsDragging = false;
+    }
+
+    public Color TextColor => IsEmptyText
+        ? Color.FromArgb("#8E8E93")
+        : AsText is { } t && Color.TryParse(t.ColorHex, out var color) ? color : Colors.Black;
 
     // ---- Apariencia de la selección y del arrastre ----
     //
@@ -237,9 +284,12 @@ public sealed partial class ElementViewModel : ObservableObject
 
     partial void OnIsSelectedChanged(bool value)
     {
-        // Soltar la selección cancela cualquier arrastre en curso.
+        // Soltar la selección cancela cualquier arrastre y cierra la edición en curso.
         if (!value)
+        {
             IsDragging = false;
+            IsEditing = false;
+        }
 
         OnPropertyChanged(nameof(OutlineColor));
         OnPropertyChanged(nameof(OutlineThickness));
