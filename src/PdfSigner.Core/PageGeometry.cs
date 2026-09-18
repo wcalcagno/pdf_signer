@@ -138,4 +138,54 @@ public sealed class PageGeometry
         270 => (RawWidthPt - vy, vx),
         _   => (vx, vy),
     };
+
+    /// <summary>Inversa de <see cref="VisibleToRaw"/>: del MediaBox al espacio visible.</summary>
+    public (double X, double Y) RawToVisible(double rx, double ry) => Rotation switch
+    {
+        90  => (RawHeightPt - ry, rx),
+        180 => (RawWidthPt - rx, RawHeightPt - ry),
+        270 => (ry, RawWidthPt - rx),
+        _   => (rx, ry),
+    };
+
+    /// <summary>
+    /// Convierte un rectángulo en coordenadas PDF a coordenadas normalizadas visibles.
+    /// </summary>
+    /// <remarks>
+    /// Hace falta para colocar sobre la página los campos de un formulario, cuyo <c>/Rect</c>
+    /// viene en el sistema del PDF: origen abajo a la izquierda, en puntos, relativo al
+    /// MediaBox. La interfaz trabaja en el espacio visible con origen arriba y valores 0..1.
+    ///
+    /// Es el camino inverso del que se recorre al firmar, y arrastra las mismas dos trampas:
+    /// la rotación de la página y un MediaBox que no empiece en el origen. Por eso vive aquí
+    /// y no en la interfaz, donde no habría forma de probarlo.
+    ///
+    /// Las esquinas llegan en cualquier orden —el estándar no obliga a que la primera sea la
+    /// inferior izquierda— y la rotación además intercambia cuál es cuál, así que se
+    /// normalizan con mínimo y máximo en vez de asumir un orden.
+    /// </remarks>
+    public NormalizedRect ToNormalizedRect(double x1, double y1, double x2, double y2)
+    {
+        // Al espacio local del MediaBox, todavía con Y hacia arriba.
+        var izquierda = Math.Min(x1, x2) - OriginX;
+        var derecha = Math.Max(x1, x2) - OriginX;
+        var abajo = Math.Min(y1, y2) - OriginY;
+        var arriba = Math.Max(y1, y2) - OriginY;
+
+        // A Y hacia abajo, que es como razona el resto del código.
+        var superior = RawHeightPt - arriba;
+        var inferior = RawHeightPt - abajo;
+
+        var (ax, ay) = RawToVisible(izquierda, superior);
+        var (bx, by) = RawToVisible(derecha, inferior);
+
+        if (VisibleWidthPt <= 0 || VisibleHeightPt <= 0)
+            return default;
+
+        return new NormalizedRect(
+            Math.Min(ax, bx) / VisibleWidthPt,
+            Math.Min(ay, by) / VisibleHeightPt,
+            Math.Abs(bx - ax) / VisibleWidthPt,
+            Math.Abs(by - ay) / VisibleHeightPt).Clamped();
+    }
 }

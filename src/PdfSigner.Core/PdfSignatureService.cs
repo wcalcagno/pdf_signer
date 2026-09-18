@@ -28,26 +28,12 @@ public sealed class PdfSignatureService
     }
 
     /// <summary>Abre el documento traduciendo los fallos a mensajes que el usuario entienda.</summary>
-    private static PdfDocument Abrir(Stream pdf, PdfDocumentOpenMode modo)
-    {
-        try
-        {
-            return PdfReader.Open(AsSeekable(pdf), modo);
-        }
-        catch (PdfReaderException ex) when (ex.Message.Contains("password", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new PdfSignerException(
-                "El PDF está protegido con contraseña. Quítale la protección antes de firmarlo.", ex);
-        }
-        catch (Exception ex) when (ex is not PdfSignerException)
-        {
-            // Se agrupa todo lo demás a propósito: PDFsharp lanza desde ArgumentOutOfRangeException
-            // hasta InvalidOperationException según por dónde se rompa el archivo, y para quien
-            // firma un contrato la causa concreta es irrelevante.
-            throw new PdfSignerException(
-                "No se pudo leer el archivo: no parece un PDF válido o está dañado.", ex);
-        }
-    }
+    /// <remarks>
+    /// La apertura y la traducción de errores viven en PdfStreams porque el servicio de
+    /// formularios abre los mismos documentos y debe dar exactamente los mismos mensajes.
+    /// </remarks>
+    private static PdfDocument Abrir(Stream pdf, PdfDocumentOpenMode modo) =>
+        PdfStreams.Open(pdf, modo);
 
     /// <summary>
     /// Escribe <paramref name="elements"/> sobre <paramref name="input"/> y guarda en
@@ -195,18 +181,4 @@ public sealed class PdfSignatureService
         };
     }
 
-    /// <summary>PdfReader necesita poder hacer seek; los streams de red o de picker a veces no.</summary>
-    private static Stream AsSeekable(Stream stream)
-    {
-        if (stream.CanSeek)
-        {
-            stream.Position = 0;
-            return stream;
-        }
-
-        var ms = new MemoryStream();
-        stream.CopyTo(ms);
-        ms.Position = 0;
-        return ms;
-    }
 }
