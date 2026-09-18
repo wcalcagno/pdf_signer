@@ -275,7 +275,7 @@
               SizeChanged="OnCanvasResized">
 
             <!-- Capa 1: la página, con desplazamiento y zoom. -->
-            <ScrollView Orientation="Both">
+            <ScrollView x:Name="CanvasScroll" Orientation="Both">
                 <Grid Padding="24" HorizontalOptions="Center" VerticalOptions="Center">
                     <!--
                         El zoom cambia el TAMAÑO de la página, no su Scale. Scale no afecta al
@@ -534,13 +534,55 @@
                  resuelva bien, que es lo que fallaba. -->
             <Grid Grid.Row="1"
                   Padding="12,8"
-                  ColumnDefinitions="*,Auto"
+                  ColumnDefinitions="*,Auto,Auto"
                   MinimumHeightRequest="34"
                   BackgroundColor="{AppThemeBinding Light={StaticResource FondoNavegador}, Dark={StaticResource FondoNavegadorOscuro}}">
                 <Label Text="{Binding Status}" Style="{StaticResource EtiquetaEstado}" />
-                <ActivityIndicator Grid.Column="1"
+
+                <!--
+                    Los controles de zoom van aqui y no en la barra de arriba porque no son
+                    una accion sobre el documento sino un ajuste de como se mira, igual que en
+                    cualquier visor. Ademas la barra de arriba ya compite por sitio.
+
+                    Hacen falta aunque exista el gesto de pellizco: en escritorio con raton no
+                    hay pellizco, y Ctrl+rueda no se descubre solo.
+                -->
+                <HorizontalStackLayout Grid.Column="1"
+                                       Spacing="4"
+                                       IsVisible="{Binding HasDocument}"
+                                       VerticalOptions="Center">
+
+                    <Button Text="−"
+                            Command="{Binding ZoomOutCommand}"
+                            Style="{StaticResource BotonZoom}"
+                            SemanticProperties.Description="Alejar"
+                            ToolTipProperties.Text="Alejar (Ctrl + rueda del ratón)" />
+
+                    <Label Text="{Binding ZoomLabel}"
+                           FontSize="12"
+                           WidthRequest="52"
+                           HorizontalTextAlignment="Center"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextoTenue}" />
+
+                    <Button Text="+"
+                            Command="{Binding ZoomInCommand}"
+                            Style="{StaticResource BotonZoom}"
+                            SemanticProperties.Description="Acercar"
+                            ToolTipProperties.Text="Acercar (Ctrl + rueda del ratón)" />
+
+                    <Button Text="Ajustar"
+                            Command="{Binding ZoomResetCommand}"
+                            FontSize="12"
+                            Padding="10,0"
+                            HeightRequest="26"
+                            ToolTipProperties.Text="Encajar la página entera en la ventana" />
+                </HorizontalStackLayout>
+
+                <ActivityIndicator Grid.Column="2"
                                    IsRunning="{Binding IsBusy}"
                                    IsVisible="{Binding IsBusy}"
+                                   Margin="8,0,0,0"
                                    HeightRequest="16" WidthRequest="16" />
             </Grid>
         </Grid>

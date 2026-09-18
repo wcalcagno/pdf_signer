@@ -51,6 +51,17 @@
     <Color x:Key="BordeCampo">#800A84FF</Color>
     <Color x:Key="TintaCampo">#1C1C1E</Color>
 
+    <!-- Los dos botones de zoom son cuadrados y pequeños: van en la barra de estado, que es
+         una franja estrecha, y su etiqueta es un solo caracter. -->
+    <Style x:Key="BotonZoom" TargetType="Button">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="WidthRequest" Value="30" />
+        <Setter Property="HeightRequest" Value="26" />
+        <Setter Property="MinimumWidthRequest" Value="0" />
+        <Setter Property="MinimumHeightRequest" Value="0" />
+    </Style>
+
     <Style x:Key="RegionBarra" TargetType="Grid">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Light={StaticResource FondoBarra}, Dark={StaticResource FondoBarraOscuro}}" />

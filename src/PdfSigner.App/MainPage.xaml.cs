@@ -22,6 +22,11 @@ public partial class MainPage : ContentPage
 
         if (DeviceInfo.Current.Idiom != DeviceIdiom.Desktop)
             AplicarDisposicionMovil();
+
+#if WINDOWS
+        // El control nativo todavía no existe aquí, así que se espera a que el handler llegue.
+        PageHost.HandlerChanged += (_, _) => ConectarRuedaRaton();
+#endif
     }
 
 #if DEBUG
@@ -245,6 +250,62 @@ public partial class MainPage : ContentPage
         "BottomLeft" => ResizeCorner.BottomLeft,
         _ => ResizeCorner.BottomRight,
     };
+
+#if WINDOWS
+    /// <summary>
+    /// Conecta Ctrl + rueda del ratón al zoom.
+    /// </summary>
+    /// <remarks>
+    /// MAUI no tiene gesto de rueda, así que hay que bajar al control nativo. Es específico de
+    /// Windows a propósito: en móvil está el pellizco, y en Mac el zoom del trackpad llega ya
+    /// como pellizco.
+    ///
+    /// El manejador se engancha al contenedor de la PÁGINA y no al ScrollView. En WinUI el
+    /// evento sube desde donde está el puntero, así que marcándolo como atendido ahí el
+    /// ScrollView ya no lo ve y no desplaza el documento además de ampliarlo. Enganchándolo al
+    /// ScrollView, éste ya habría desplazado antes de que nos llegara el turno.
+    /// </remarks>
+    private void ConectarRuedaRaton()
+    {
+        if (_ruedaConectada || PageHost.Handler?.PlatformView is not Microsoft.UI.Xaml.UIElement nativo)
+            return;
+
+        nativo.PointerWheelChanged += OnRuedaRaton;
+        _ruedaConectada = true;
+    }
+
+    private bool _ruedaConectada;
+
+    private void OnRuedaRaton(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        var elemento = (Microsoft.UI.Xaml.UIElement)sender;
+        var punto = e.GetCurrentPoint(elemento);
+
+        var control = Microsoft.UI.Input.InputKeyboardSource
+            .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+
+        // Sin Ctrl la rueda es lo que espera cualquiera: desplazar el documento.
+        if (!control.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+            return;
+
+        var factor = _vm.ZoomBy(punto.Properties.MouseWheelDelta > 0 ? 1.15 : 1 / 1.15);
+        e.Handled = true;
+
+        if (Math.Abs(factor - 1) < 0.0001)
+            return;
+
+        // Se acompaña con el desplazamiento para que el punto del documento que está bajo el
+        // puntero siga estándolo. Sin esto, acercarse para rellenar un campo pequeño lo saca
+        // de la vista y hay que ir a buscarlo, que es justo lo contrario de lo que se pedía.
+        var destinoX = CanvasScroll.ScrollX + punto.Position.X * (factor - 1);
+        var destinoY = CanvasScroll.ScrollY + punto.Position.Y * (factor - 1);
+
+        // Aplazado: la página todavía no ha cambiado de tamaño, y hasta que no lo haga el
+        // ScrollView no admite el recorrido nuevo y recortaría el destino.
+        Dispatcher.Dispatch(async () =>
+            await CanvasScroll.ScrollToAsync(Math.Max(0, destinoX), Math.Max(0, destinoY), false));
+    }
+#endif
 
     private void OnPagePinch(object? sender, PinchGestureUpdatedEventArgs e)
     {

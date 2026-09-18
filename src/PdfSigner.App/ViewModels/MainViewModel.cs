@@ -1000,6 +1000,43 @@ public sealed partial class MainViewModel : ObservableObject
         _viewportHeight = height;
     }
 
+    /// <summary>Límites de la ampliación, compartidos por todas las formas de cambiarla.</summary>
+    /// <remarks>
+    /// El máximo es alto a propósito: rellenar un campo de formulario de veinte puntos exige
+    /// acercarse bastante más de lo que hace falta para colocar una firma.
+    /// </remarks>
+    public const double ZoomMinimo = 0.2;
+
+    public const double ZoomMaximo = 5;
+
+    /// <summary>Ampliación actual en porcentaje, para mostrarla.</summary>
+    public string ZoomLabel => $"{Zoom * 100:0} %";
+
+    /// <summary>
+    /// Multiplica la ampliación y devuelve el factor REALMENTE aplicado.
+    /// </summary>
+    /// <remarks>
+    /// Devuelve el factor efectivo y no void porque al llegar al tope el zoom deja de crecer,
+    /// y quien quiera acompañar la ampliación con un desplazamiento necesita saber cuánto se
+    /// movió de verdad. Con el factor pedido, la página se descolocaría al forzar el límite.
+    /// </remarks>
+    public double ZoomBy(double factor)
+    {
+        var antes = Zoom;
+        Zoom = Math.Clamp(antes * factor, ZoomMinimo, ZoomMaximo);
+        return antes > 0 ? Zoom / antes : 1;
+    }
+
+    [RelayCommand]
+    private void ZoomIn() => ZoomBy(1.25);
+
+    [RelayCommand]
+    private void ZoomOut() => ZoomBy(1 / 1.25);
+
+    /// <summary>Vuelve a encajar la página entera. Es la salida de emergencia del zoom.</summary>
+    [RelayCommand]
+    private void ZoomReset() => ZoomToFit();
+
     /// <summary>Ajusta la ampliación para que la página entre entera en pantalla.</summary>
     /// <remarks>
     /// Sin esto, un A4 rasterizado a 1200 px se abre más grande que la ventana y el usuario
@@ -1015,7 +1052,7 @@ public sealed partial class MainViewModel : ObservableObject
             (_viewportWidth - margen) / CanvasWidth,
             (_viewportHeight - margen) / CanvasHeight);
 
-        Zoom = Math.Clamp(ajuste, 0.1, 2);
+        Zoom = Math.Clamp(ajuste, ZoomMinimo, 2);
     }
 
     partial void OnCanvasWidthChanged(double value) => PropagateCanvasSize();
@@ -1028,6 +1065,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(DisplayWidth));
         OnPropertyChanged(nameof(DisplayHeight));
+        OnPropertyChanged(nameof(ZoomLabel));
 
         // Los elementos trabajan en píxeles de pantalla, así que su lienzo de referencia es
         // el tamaño ya ampliado. Gracias a eso los gestos no necesitan dividir por el zoom.
