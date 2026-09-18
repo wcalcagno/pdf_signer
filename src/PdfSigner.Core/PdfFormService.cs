@@ -14,6 +14,19 @@ namespace PdfSigner.Core;
 /// </remarks>
 public sealed class PdfFormService
 {
+    /// <summary>
+    /// Registra el resolver de fuentes, que hace falta incluso para LEER un formulario.
+    /// </summary>
+    /// <remarks>
+    /// No es precaución: el constructor de PdfTextField de PDFsharp crea un XFont, así que
+    /// enumerar los campos de un documento revienta con «No appropriate font found» si no hay
+    /// resolver registrado. Dentro de la aplicación no se notaba porque el servicio de firma
+    /// lo registra al construirse, y en las pruebas tampoco porque lo hace el generador de
+    /// formularios: solo aparece al usar esta clase por su cuenta, que es justo lo que haría
+    /// cualquiera que se lleve la biblioteca.
+    /// </remarks>
+    public PdfFormService() => EmbeddedFontResolver.Register();
+
     /// <summary>True si el documento trae un formulario con al menos un campo.</summary>
     public bool HasForm(Stream pdf)
     {

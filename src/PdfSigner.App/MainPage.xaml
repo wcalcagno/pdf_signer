@@ -227,6 +227,32 @@
                 dos acciones que nunca deben poder quedarse fuera de la vista.
             -->
             <HorizontalStackLayout Grid.Column="1" Spacing="8" Margin="8,0,0,0" VerticalOptions="Center">
+
+                <!--
+                    Solo aparece si el documento trae formulario: en un PDF normal no hay
+                    campos que bloquear y la opción sería ruido.
+
+                    Va pegada a Exportar y no en el inspector porque describe cómo va a salir
+                    el archivo, no una propiedad de nada seleccionado; y porque es una decisión
+                    que se toma justo antes de exportar, no mientras se rellena.
+                -->
+                <HorizontalStackLayout Spacing="4"
+                                       IsVisible="{Binding HasForm}"
+                                       VerticalOptions="Center">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding ToggleLockFieldsCommand}" />
+                    </HorizontalStackLayout.GestureRecognizers>
+
+                    <CheckBox IsChecked="{Binding LockFieldsOnExport, Mode=TwoWay}"
+                              VerticalOptions="Center"
+                              SemanticProperties.Description="Bloquear los campos al exportar" />
+
+                    <Label Text="Bloquear campos al exportar"
+                           FontSize="12"
+                           VerticalOptions="Center"
+                           ToolTipProperties.Text="El PDF exportado conserva lo escrito pero ya no se puede editar." />
+                </HorizontalStackLayout>
+
                 <Button Text="↶"
                         Command="{Binding UndoCommand}"
                         WidthRequest="48"

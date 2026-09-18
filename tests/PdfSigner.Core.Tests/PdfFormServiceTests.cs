@@ -202,6 +202,17 @@ public class PdfFormServiceTests
     }
 
     [Fact]
+    public void Construir_el_servicio_deja_listas_las_fuentes()
+    {
+        // Leer un formulario necesita resolver de fuentes: PDFsharp crea un XFont dentro del
+        // constructor de cada campo de texto. Sin esto, enumerar los campos de un documento
+        // lanza «No appropriate font found» en cuanto la biblioteca se usa por su cuenta.
+        _ = new PdfFormService();
+
+        Assert.NotNull(PdfSharp.Fonts.GlobalFontSettings.FontResolver);
+    }
+
+    [Fact]
     public void Leer_no_modifica_el_documento()
     {
         using var pdf = FormAssets.CrearFormulario();

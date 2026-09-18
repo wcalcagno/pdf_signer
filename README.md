@@ -34,6 +34,10 @@ Lo que sí garantiza:
 - El contenido original del documento se mantiene intacto.
 - El archivo crece unos pocos KB, no varios MB, porque no se rasteriza nada.
 
+Desde la versión 1.1 también **rellena formularios** (AcroForms): si el PDF trae campos, se
+muestran resaltados sobre la página y se pueden completar antes de firmar. Ver
+[Formularios](#formularios).
+
 ![Ejemplo de salida](docs/ejemplo-salida.png)
 
 *Salida real generada por `PdfSigner.Core`. La firma conserva el canal alfa y las tres
@@ -69,8 +73,9 @@ la firma, exportar— no la ha probado nadie todavía.
 **Si lo pruebas en alguna de esas plataformas, un issue contando qué pasó es la
 contribución más valiosa que puedes hacer ahora mismo.**
 
-El núcleo de firma (`PdfSigner.Core`) está cubierto por **176 pruebas** que corren en CI sin
-emulador ni Mac, y es donde vive toda la lógica que puede producir un PDF incorrecto.
+El núcleo (`PdfSigner.Core`) está cubierto por **244 pruebas** que corren en CI sin emulador
+ni Mac, y es donde vive toda la lógica que puede producir un PDF incorrecto: firmar,
+rellenar formularios y aplanarlos.
 
 ## Arquitectura
 
@@ -79,7 +84,7 @@ Tres proyectos, con una separación que no es decorativa:
 ```
 src/PdfSigner.Core/    Lógica de firma. .NET puro, sin MAUI.
 src/PdfSigner.App/     Interfaz MAUI y código específico de cada plataforma.
-tests/PdfSigner.Core.Tests/   176 pruebas, corren en CI sin emulador ni Mac.
+tests/PdfSigner.Core.Tests/   244 pruebas, corren en CI sin emulador ni Mac.
 ```
 
 `PdfSigner.Core` **no referencia MAUI**. Gracias a eso, la parte que de verdad puede
@@ -155,12 +160,14 @@ dotnet test tests/PdfSigner.Core.Tests/PdfSigner.Core.Tests.csproj
 ## Uso
 
 1. **Abrir PDF** y navegar por las páginas con la tira de miniaturas.
-2. **Añadir firma** para colocar una imagen PNG o JPG. Arrástrala para moverla y usa
+2. **Rellenar los campos** si el documento es un formulario: aparecen resaltados sobre la
+   página. Ver [Formularios](#formularios).
+3. **Añadir firma** para colocar una imagen PNG o JPG. Arrástrala para moverla y usa
    cualquiera de las **cuatro asas de las esquinas** para cambiar su tamaño: la esquina
    opuesta se queda donde está.
-3. **Añadir texto** para un bloque multilínea, con tamaño y una paleta de colores.
-4. **Deshacer** (↶) retrocede el último movimiento, cambio de tamaño o borrado.
-5. **Exportar**: diálogo de guardado en escritorio, hoja de compartir en móvil.
+4. **Añadir texto** para un bloque multilínea, con tamaño y una paleta de colores.
+5. **Deshacer** (↶) retrocede el último movimiento, cambio de tamaño o borrado.
+6. **Exportar**: diálogo de guardado en escritorio, hoja de compartir en móvil.
 
 Al seleccionar un elemento aparecen sus propiedades: en escritorio, en una columna fija a
 la derecha; en móvil, en un panel que sube desde abajo. Sobre la página flota además una
@@ -180,6 +187,35 @@ favorita guardada hace meses estampa la fecha del día en que firmas de verdad.
 | `{hora}` | `14:30` |
 | `{fechalarga}` | `13 de septiembre de 2026` |
 
+### Formularios
+
+Si el PDF trae campos de formulario, aparecen resaltados en azul sobre la página y se pueden
+rellenar directamente ahí. Están los cinco tipos: texto de una o varias líneas, casillas,
+grupos de opciones excluyentes, desplegables y listas. Los campos de solo lectura se
+respetan, y los de firma criptográfica se dejan intactos porque quedan fuera del alcance de
+esta herramienta.
+
+**Bloquear campos al exportar**, junto al botón Exportar, viene activado. Con él, el PDF que
+se genera conserva lo escrito pero deja de ser editable: las respuestas se convierten en
+contenido fijo de la página y el formulario desaparece. Es lo que se quiere al entregar algo
+firmado. Desmárcalo si lo que quieres es pasarle el formulario a medias a otra persona para
+que lo complete. En cualquier caso, el documento abierto en la aplicación conserva sus
+campos, así que puedes corregir y volver a exportar.
+
+Dos avisos honestos:
+
+- El valor se dibuja en la página con la fuente Helvetica estándar, no con la que declare el
+  formulario si es una fuente embebida suya. El texto queda en su sitio y con su tamaño, pero
+  puede no ser exactamente la misma letra.
+- Los caracteres fuera de Latin-1 (un guion largo, el símbolo del euro) salen como `?`.
+
+Sobre cuánto está probado: unas 60 de las pruebas del núcleo cubren leer, rellenar y aplanar
+los cinco tipos, incluyendo páginas rotadas y con el MediaBox desplazado, y el resultado se
+ha comprobado también rasterizando el PDF, no solo releyendo los valores. Pero todos los
+formularios de prueba están construidos a mano por el propio proyecto: **no se ha probado
+todavía con formularios reales generados por Acrobat o LibreOffice**, que pueden traer
+estructuras que aquí no se reproducen.
+
 ### Firma favorita
 
 **Guardar favorita** memoriza tu imagen y tu bloque de texto en el dispositivo para
@@ -190,6 +226,7 @@ sincroniza entre dispositivos.
 
 Fuera del alcance de esta versión, por orden aproximado de interés:
 
+- [ ] Probar el relleno de formularios con archivos reales de Acrobat y LibreOffice
 - [ ] Firma criptográfica: PAdES y certificados X.509
 - [ ] Validación de firmas de terceros
 - [ ] Firma en lote de varios PDFs

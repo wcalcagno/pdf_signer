@@ -63,6 +63,7 @@ public sealed partial class MainViewModel : ObservableObject
         // Las partial properties no aceptan inicializador; los valores de partida van aquí.
         Status = "Abre un PDF para empezar.";
         Zoom = 1;
+        LockFieldsOnExport = true;
     }
 
     public ObservableCollection<PageViewModel> Pages { get; } = [];
@@ -83,6 +84,19 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<FormFieldViewModel> VisibleFormFields { get; } = [];
 
     public bool HasForm => FormFields.Count > 0;
+
+    /// <summary>Fijar los campos en el PDF exportado, de modo que ya no se puedan editar.</summary>
+    /// <remarks>
+    /// Viene activado. Lo normal al firmar algo es entregarlo cerrado: un formulario exportado
+    /// sin fijar sigue siendo editable por quien lo reciba, y las respuestas que aparecen
+    /// junto a la firma podrian cambiarse despues sin dejar rastro. Quien necesite lo
+    /// contrario —mandar el formulario a medias para que otro lo complete— lo desmarca.
+    ///
+    /// Solo afecta al archivo que se exporta. El documento abierto en la aplicacion conserva
+    /// sus campos, asi que se puede seguir corrigiendo y volver a exportar.
+    /// </remarks>
+    [ObservableProperty]
+    public partial bool LockFieldsOnExport { get; set; }
 
     public bool HasDocument => _pdfBytes is { Length: > 0 };
 
@@ -195,7 +209,19 @@ public sealed partial class MainViewModel : ObservableObject
                 Pulsar("asistira", "no");
             }
 
-            Status = $"Formulario de ejemplo: {ContarCampos()} campos (modo demo).";
+            if (Services.DemoContent.ExportarDemo)
+            {
+                LockFieldsOnExport = !Services.DemoContent.ExportarSinBloquear;
+
+                var destino = Path.Combine(Path.GetTempPath(), "pdfsigner-demo-export.pdf");
+                File.WriteAllBytes(destino, await GenerarPdfAsync());
+                Status = $"Exportado a {destino} (bloqueo: {LockFieldsOnExport}).";
+            }
+            else
+            {
+                Status = $"Formulario de ejemplo: {ContarCampos()} campos (modo demo).";
+            }
+
             _ = GenerateThumbnailsAsync();
             return;
         }
@@ -786,6 +812,14 @@ public sealed partial class MainViewModel : ObservableObject
         Status = "Firma favorita colocada.";
     }
 
+    /// <summary>Alterna el bloqueo. Lo usa la etiqueta de la casilla.</summary>
+    /// <remarks>
+    /// Tocar el rotulo es lo que espera cualquiera, y la casilla por si sola es un blanco
+    /// pequeño, sobre todo con el dedo.
+    /// </remarks>
+    [RelayCommand]
+    private void ToggleLockFields() => LockFieldsOnExport = !LockFieldsOnExport;
+
     // -------------------------------------------------------------- exportar
 
     [RelayCommand]
@@ -799,33 +833,50 @@ public sealed partial class MainViewModel : ObservableObject
 
         await RunBusyAsync("Generando el PDF firmado...", async () =>
         {
-            using var output = new MemoryStream();
-
-            var valores = ValoresDelFormulario();
-            var elementos = Elements.Select(e => e.Element).ToList();
-            var origen = _pdfBytes;
-
-            // El trabajo pesado va a un hilo de fondo: en un PDF grande bloquearía la interfaz.
-            await Task.Run(() =>
-            {
-                using var entrada = new MemoryStream(origen);
-                using var intermedio = new MemoryStream();
-
-                // Se rellena primero y se firma encima. Al revés daría el mismo resultado pero
-                // obligaría a abrir y guardar el documento una vez más.
-                if (valores.Count > 0)
-                    _forms.Fill(entrada, intermedio, valores);
-                else
-                    entrada.CopyTo(intermedio);
-
-                intermedio.Position = 0;
-                _signer.Sign(intermedio, output, elementos);
-            });
+            var fijar = HasForm && LockFieldsOnExport;
+            var pdf = await GenerarPdfAsync();
 
             var name = $"{Path.GetFileNameWithoutExtension(_sourceFileName)}-firmado.pdf";
-            var delivered = await _exporter.ExportAsync(name, output.ToArray());
+            var delivered = await _exporter.ExportAsync(name, pdf);
 
-            Status = delivered ? $"Listo: {name}" : "Exportación cancelada.";
+            Status = delivered
+                ? fijar ? $"Listo: {name} · campos fijados" : $"Listo: {name}"
+                : "Exportación cancelada.";
+        });
+    }
+
+    /// <summary>
+    /// Construye el PDF final: rellena el formulario y firma encima.
+    /// </summary>
+    /// <remarks>
+    /// Separado de la exportación para que el arnés de desarrollo pueda ejercitar ESTA misma
+    /// tubería sin pasar por el diálogo de guardar, que no se puede automatizar. Probar una
+    /// copia del proceso no serviría de nada: el fallo estaría justo en la diferencia.
+    /// </remarks>
+    private async Task<byte[]> GenerarPdfAsync()
+    {
+        var valores = ValoresDelFormulario();
+        var elementos = Elements.Select(e => e.Element).ToList();
+        var origen = _pdfBytes ?? [];
+        var fijar = HasForm && LockFieldsOnExport;
+
+        // El trabajo pesado va a un hilo de fondo: en un PDF grande bloquearía la interfaz.
+        return await Task.Run(() =>
+        {
+            using var entrada = new MemoryStream(origen);
+            using var intermedio = new MemoryStream();
+            using var salida = new MemoryStream();
+
+            // Se rellena primero y se firma encima. Al revés daría el mismo resultado pero
+            // obligaría a abrir y guardar el documento una vez más.
+            if (valores.Count > 0)
+                _forms.Fill(entrada, intermedio, valores, flatten: fijar);
+            else
+                entrada.CopyTo(intermedio);
+
+            intermedio.Position = 0;
+            _signer.Sign(intermedio, salida, elementos);
+            return salida.ToArray();
         });
     }
 

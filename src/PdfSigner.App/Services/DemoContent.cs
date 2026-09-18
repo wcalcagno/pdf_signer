@@ -39,7 +39,7 @@ internal static class DemoContent
         Environment.GetEnvironmentVariable(VariableEntorno)?.ToLowerInvariant() ?? string.Empty;
 
     /// <summary>Con PDFSIGNER_DEMO=form o formlleno se carga un formulario en vez del contrato.</summary>
-    public static bool EsFormulario => Modo is "form" or "formlleno";
+    public static bool EsFormulario => Modo is "form" or "formlleno" or "formexporta" or "formabierto";
 
     /// <summary>
     /// Con PDFSIGNER_DEMO=formlleno el formulario arranca con todos los campos escritos.
@@ -49,7 +49,22 @@ internal static class DemoContent
     /// con la vista que marcar una opcion apaga las demas del grupo, que es justo la parte
     /// que depende de que varias zonas compartan el mismo objeto de campo.
     /// </remarks>
-    public static bool RellenarDemo => Modo == "formlleno";
+    public static bool RellenarDemo => Modo is "formlleno" or "formexporta" or "formabierto";
+
+    /// <summary>
+    /// Con PDFSIGNER_DEMO=formexporta se rellena, se exporta a un archivo y se avisa dónde.
+    /// </summary>
+    /// <remarks>
+    /// El diálogo de guardar no se puede automatizar, así que sin esto la exportación es lo
+    /// único de la aplicación que nadie llega a ejercitar. Recorre la MISMA tubería que el
+    /// botón, solo que escribiendo el resultado en la carpeta temporal.
+    ///
+    /// Con formabierto hace lo mismo pero sin bloquear los campos, para poder comparar.
+    /// </remarks>
+    public static bool ExportarDemo => Modo is "formexporta" or "formabierto";
+
+    /// <summary>Con formabierto el PDF exportado conserva los campos editables.</summary>
+    public static bool ExportarSinBloquear => Modo == "formabierto";
 
     /// <summary>
     /// Formulario de una página con los cinco tipos de campo.
