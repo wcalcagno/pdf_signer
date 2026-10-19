@@ -177,13 +177,13 @@ public partial class MainPage : ContentPage
     {
         vm.IsEditing = true;
 
-        if ((origen as Border)?.Content is not Grid contenido)
-            return;
-
-        var editor = contenido.Children.OfType<Editor>().FirstOrDefault();
-
-        if (editor is not null)
+        // El editor es HERMANO del borde tocado, no hijo suyo: dentro quedaría recortado a la
+        // altura del bloque, que en una línea son unos pocos píxeles.
+        if ((origen as Element)?.Parent is Grid contenedor
+            && contenedor.Children.OfType<Editor>().FirstOrDefault() is { } editor)
+        {
             Enfocar(editor);
+        }
     }
 
     /// <summary>Pone el cursor en un bloque que nace ya abierto para escribir.</summary>
@@ -211,8 +211,29 @@ public partial class MainPage : ContentPage
             vm.IsEditing = false;
     }
 
-    /// <summary>Tocar el fondo suelta la selección y con ella la barra flotante.</summary>
-    private void OnCanvasTapped(object? sender, TappedEventArgs e) => _vm.Select(null);
+    /// <summary>
+    /// El toque en el fondo coloca el bloque de texto pendiente, o suelta la selección.
+    /// </summary>
+    /// <remarks>
+    /// La posición se pide respecto de PageHost y no del control tocado: PageHost es la
+    /// página, así que sus coordenadas se convierten a proporción dividiendo por el tamaño
+    /// mostrado, sin tener que contar el zoom ni el desplazamiento del ScrollView.
+    /// </remarks>
+    private void OnCanvasTapped(object? sender, TappedEventArgs e)
+    {
+        if (!_vm.IsPlacingText)
+        {
+            _vm.Select(null);
+            return;
+        }
+
+        // Un toque fuera de la página cancela en vez de colocar el bloque en un borde: quien
+        // pincha el gris no está señalando un sitio del documento.
+        if (e.GetPosition(PageHost) is { } punto && _vm.TryPlaceTextAt(punto.X, punto.Y))
+            return;
+
+        _vm.CancelPlacingText();
+    }
 
     private void OnElementPan(object? sender, PanUpdatedEventArgs e)
     {

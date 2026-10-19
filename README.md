@@ -165,10 +165,13 @@ dotnet test tests/PdfSigner.Core.Tests/PdfSigner.Core.Tests.csproj
 3. **Añadir firma** para colocar una imagen PNG o JPG. Arrástrala para moverla y usa
    cualquiera de las **cuatro asas de las esquinas** para cambiar su tamaño: la esquina
    opuesta se queda donde está.
-4. **Añadir texto** coloca un bloque vacío con el cursor ya dentro: escribes ahí mismo,
-   sobre la página. Para corregirlo después, tócalo una vez para seleccionarlo y otra para
-   volver a escribir. Toca fuera para terminar. El tamaño y el color se ajustan en el panel
-   de propiedades.
+4. **Añadir texto** y luego **toca el documento donde quieras escribir**: ahí aparece un
+   bloque vacío con el cursor ya dentro. Para corregirlo después, tócalo una vez para
+   seleccionarlo y otra para volver a escribir. Toca fuera para terminar. El tamaño y el
+   color se ajustan en el panel de propiedades.
+
+   El texto se dibuja en pantalla al **mismo tamaño que tendrá en el PDF**, así que lo que
+   ves colocado es lo que se exporta.
 
    Sirve también para **rellenar formularios que no son formularios**: muchos PDF traen las
    líneas impresas pero no campos de verdad, y entonces no hay nada que la aplicación pueda

@@ -16,6 +16,7 @@ public sealed partial class ElementViewModel : ObservableObject
 
     private double _canvasWidth;
     private double _canvasHeight;
+    private double _pixelesPorPunto = 1;
 
     [ObservableProperty]
     public partial bool IsSelected { get; set; }
@@ -85,15 +86,28 @@ public sealed partial class ElementViewModel : ObservableObject
     public ImageSource? Preview =>
         ImageData is { Length: > 0 } data ? ImageSource.FromStream(() => new MemoryStream(data)) : null;
 
-    /// <summary>Informa del tamaño en píxeles de la página mostrada.</summary>
-    public void SetCanvasSize(double width, double height)
+    /// <summary>Informa del tamaño en píxeles de la página mostrada y de su alto real.</summary>
+    /// <param name="pageHeightPt">
+    /// Alto de la página en puntos PDF. Es lo que permite saber cuántos píxeles de pantalla
+    /// vale un punto, y sin eso la vista previa no puede dibujar el texto a su tamaño.
+    /// </param>
+    public void SetCanvasSize(double width, double height, double pageHeightPt)
     {
-        if (Math.Abs(_canvasWidth - width) < 0.5 && Math.Abs(_canvasHeight - height) < 0.5)
+        var escala = pageHeightPt > 0 ? height / pageHeightPt : 1;
+
+        if (Math.Abs(_canvasWidth - width) < 0.5
+            && Math.Abs(_canvasHeight - height) < 0.5
+            && Math.Abs(_pixelesPorPunto - escala) < 0.0001)
+        {
             return;
+        }
 
         _canvasWidth = width;
         _canvasHeight = height;
+        _pixelesPorPunto = escala;
+
         NotifyGeometryChanged();
+        NotifyTextChanged();
     }
 
     /// <summary>Desplaza el elemento. Los incrementos llegan en píxeles de pantalla.</summary>
@@ -143,6 +157,7 @@ public sealed partial class ElementViewModel : ObservableObject
         OnPropertyChanged(nameof(DisplayText));
         OnPropertyChanged(nameof(IsEmptyText));
         OnPropertyChanged(nameof(FontSize));
+        OnPropertyChanged(nameof(EditFontSize));
         OnPropertyChanged(nameof(TextColor));
     }
 
@@ -214,7 +229,27 @@ public sealed partial class ElementViewModel : ObservableObject
 
     public bool IsEmptyText => IsText && string.IsNullOrWhiteSpace(AsText?.Text);
 
-    public double FontSize => AsText?.FontSizePt ?? 11;
+    /// <summary>
+    /// Tamaño de letra de la vista previa, en píxeles de pantalla.
+    /// </summary>
+    /// <remarks>
+    /// Los puntos del PDF NO son píxeles de pantalla. Antes aquí se devolvía el tamaño en
+    /// puntos tal cual, y el bloque se veía de un tamaño que no era el que acababa teniendo:
+    /// el desajuste dependía del zoom y cambiaba de signo en torno al 50%, de modo que al
+    /// acercarse para escribir sobre una línea el texto se veía MÁS PEQUEÑO de lo que luego
+    /// salía. Colocado a ojo, el PDF exportado se desbordaba.
+    ///
+    /// Convertido con la escala de la página, lo que se ve en pantalla es lo que queda.
+    /// </remarks>
+    public double FontSize => (AsText?.FontSizePt ?? 11) * _pixelesPorPunto;
+
+    /// <summary>Tamaño de letra mientras se escribe, con un mínimo legible.</summary>
+    /// <remarks>
+    /// Con la página alejada, el tamaño fiel puede quedar en cuatro o cinco píxeles: cierto,
+    /// pero imposible de teclear. Solo afecta al editor, no a lo que se dibuja ni a lo que se
+    /// exporta, así que nadie se lleva una sorpresa al guardar.
+    /// </remarks>
+    public double EditFontSize => Math.Max(FontSize, 13);
 
     // ---- Edicion sobre la propia pagina ----
 

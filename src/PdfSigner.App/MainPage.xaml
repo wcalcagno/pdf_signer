@@ -371,33 +371,37 @@
                                                        IsVisible="{Binding IsNotEditing}"
                                                        LineBreakMode="WordWrap" />
 
-                                                <!--
-                                                    Se escribe sobre la propia pagina. El
-                                                    editor solo existe mientras se escribe:
-                                                    tenerlo siempre puesto se comeria el
-                                                    gesto de arrastrar el bloque.
-
-                                                    Muestra el texto CRUDO, con {fecha} sin
-                                                    resolver, que es lo que hay que poder
-                                                    corregir; la etiqueta de al lado es la
-                                                    que enseña como va a quedar.
-                                                -->
-                                                <Editor IsVisible="{Binding IsEditing}"
-                                                        Text="{Binding Text, Mode=TwoWay}"
-                                                        Placeholder="Escribe aquí"
-                                                        PlaceholderColor="{StaticResource TextoTenue}"
-                                                        FontSize="{Binding FontSize}"
-                                                        TextColor="{Binding TextColor}"
-                                                        HeightRequest="{Binding EditHeight}"
-                                                        MinimumHeightRequest="0"
-                                                        AutoSize="Disabled"
-                                                        VerticalOptions="Start"
-                                                        BackgroundColor="{StaticResource RealceCampo}"
-                                                        Loaded="OnElementEditorLoaded"
-                                                        Unfocused="OnElementEditDone" />
                                             </Grid>
                                         </Border>
 
+
+                                        <!--
+                                            El editor va FUERA del Border, como hermano suyo.
+                                            Dentro queda recortado a la altura del bloque, y
+                                            un bloque de una linea mide unos pocos pixeles con
+                                            la pagina alejada: el editor se veia como una
+                                            rendija y no se podia teclear en el. Aqui puede
+                                            crecer hasta un alto legible sin tocar el tamaño
+                                            real del elemento.
+
+                                            Muestra el texto CRUDO, con {fecha} sin resolver,
+                                            que es lo que hay que poder corregir; la etiqueta
+                                            de dentro enseña como va a quedar.
+                                        -->
+                                        <Editor IsVisible="{Binding IsEditing}"
+                                                Text="{Binding Text, Mode=TwoWay}"
+                                                Placeholder="Escribe aquí"
+                                                PlaceholderColor="{StaticResource TextoTenue}"
+                                                FontSize="{Binding EditFontSize}"
+                                                TextColor="{Binding TextColor}"
+                                                Margin="{Binding HitPadding}"
+                                                HeightRequest="{Binding EditHeight}"
+                                                MinimumHeightRequest="0"
+                                                AutoSize="Disabled"
+                                                VerticalOptions="Start"
+                                                BackgroundColor="{StaticResource RealceCampo}"
+                                                Loaded="OnElementEditorLoaded"
+                                                Unfocused="OnElementEditDone" />
                                         <!--
                                             Una asa por esquina. ClassId identifica cuál es:
                                             dentro de una plantilla no se puede usar x:Name, y

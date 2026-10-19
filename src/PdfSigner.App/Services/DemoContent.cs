@@ -61,7 +61,7 @@ internal static class DemoContent
     ///
     /// Con formabierto hace lo mismo pero sin bloquear los campos, para poder comparar.
     /// </remarks>
-    public static bool ExportarDemo => Modo is "formexporta" or "formabierto";
+    public static bool ExportarDemo => Modo is "formexporta" or "formabierto" or "exporta";
 
     /// <summary>Con formabierto el PDF exportado conserva los campos editables.</summary>
     public static bool ExportarSinBloquear => Modo == "formabierto";
