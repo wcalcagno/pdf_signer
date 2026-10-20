@@ -173,18 +173,20 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # La numeracion de .NET para iOS y la de Xcode NO se corresponden: el SDK 26.5 exige
-      # Xcode 26.6. Y el runner no tiene runtime de simulador para 26.6, solo para 26.2,
-      # 26.4 y 26.5. Por eso se compila para DISPOSITIVO mas abajo: un build de dispositivo
-      # no necesita ningun runtime de simulador.
+      # El SDK de .NET para iOS exige una version EXACTA de Xcode, y su numeracion no se
+      # corresponde con la de Xcode. Se usa el que trae .NET 10 de serie (familia 26.0), que
+      # pide Xcode 26.0.x: es la misma combinacion con la que compila el trabajo de macOS.
       #
-      # Ademas no vale cualquier carpeta: /Applications/Xcode.app resulto no tener el SDK de
-      # macOS, y sin el, actool no se puede localizar. Se comprueba antes de elegir.
+      # No vale cualquier carpeta: /Applications/Xcode.app resulto no tener el SDK de macOS,
+      # y sin el no se puede localizar actool. Se comprueba antes de elegir.
+      #
+      # Se compila para DISPOSITIVO mas abajo porque asi no hace falta ningun runtime de
+      # simulador, que el runner no tiene para todas las versiones.
       - name: Preparar Xcode
         run: |
           ls /Applications | grep -i '^Xcode' || true
           echo "--- cuales tienen el SDK de macOS ---"
-          for c in /Applications/Xcode_26.6.app /Applications/Xcode_26.6.0.app /Applications/Xcode.app; do
+          for c in /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app /Applications/Xcode.app; do
             if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
               echo "  OK  $c"
             else
@@ -193,25 +195,30 @@ jobs:
           done
 
           elegido=""
-          for c in /Applications/Xcode_26.6.app /Applications/Xcode_26.6.0.app /Applications/Xcode.app; do
+          for c in /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app /Applications/Xcode.app; do
             if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
               elegido="$c"
               break
             fi
           done
           if [ -z "$elegido" ]; then
-            echo "Ningun Xcode 26.6 con el SDK de macOS completo"; exit 1
+            echo "Ningun Xcode de la familia 26.0 con el SDK de macOS completo"; exit 1
           fi
           echo "Usando $elegido"
           sudo xcode-select -s "$elegido"
           xcodebuild -version
 
-      - name: Instalar y actualizar workloads de MAUI
+      # NO se ejecuta "dotnet workload update". Traia el Microsoft.iOS.Sdk mas reciente, que
+      # hoy es la familia 27.1 y exige Xcode 27.1: el runner no pasa de 26.6, asi que el
+      # build fallaba antes de empezar. Cuando se escribio, la actualizacion hacia falta
+      # porque el SDK incluido era mas viejo que el Xcode del runner; ahora es al reves.
+      #
+      # Con --skip-manifest-update se usa el SDK que viene con .NET 10, que es el mismo con
+      # el que compila el trabajo de macOS. "workload list" deja la version en el registro
+      # para que el proximo desajuste se vea de un vistazo.
+      - name: Instalar workloads de MAUI
         run: |
           dotnet workload install maui --skip-manifest-update
-          # La actualizacion trae el Microsoft.iOS.Sdk mas reciente, que es lo que puede
-          # aceptar el Xcode del runner.
-          dotnet workload update
           dotnet workload list
 
       # Para dispositivo y no para simulador: asi no hace falta ningun runtime de simulador,
