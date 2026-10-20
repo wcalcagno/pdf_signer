@@ -221,14 +221,23 @@ jobs:
           dotnet workload install maui --skip-manifest-update
           dotnet workload list
 
-      # Para dispositivo y no para simulador: asi no hace falta ningun runtime de simulador,
-      # que es lo que no tiene el runner para la version de Xcode que exige el SDK. La firma
-      # va desactivada porque no hay cuenta de Apple; el objetivo es unicamente comprobar
-      # que el codigo de iOS es valido.
-      - name: Compilar para dispositivo
+      # Solo el objetivo Compile: compila el C# y el XAML para iOS y se detiene ahi.
+      #
+      # No es por ahorrar tiempo. El empaquetado invoca actool, la herramienta de Apple que
+      # compila el catalogo de iconos, y actool exige un runtime de simulador que case con el
+      # Xcode seleccionado. El runner trae runtimes que no corresponden al Xcode que el SDK
+      # de .NET obliga a usar, y no hay forma de satisfacer las dos condiciones a la vez: el
+      # SDK ata la version de Xcode, y la imagen del runner decide que runtimes hay.
+      #
+      # LO QUE ESTO COMPRUEBA: que el codigo de iOS compila. LO QUE NO: el empaquetado, la
+      # firma y el catalogo de recursos. Nadie puede distribuir iOS en este proyecto de todas
+      # formas, porque eso exige una cuenta de desarrollador de Apple; cuando la haya, habra
+      # que volver a montar el empaquetado y comprobarlo en un Mac de verdad.
+      - name: Compilar el codigo de iOS
         run: >
           dotnet build src/PdfSigner.App/PdfSigner.App.csproj
           -f net10.0-ios -c Release
+          -t:Compile
           -p:RuntimeIdentifier=ios-arm64
           -p:EnableCodeSigning=false
           -p:CodesignRequireProvisioningProfile=false
