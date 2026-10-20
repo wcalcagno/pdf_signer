@@ -242,6 +242,20 @@ jobs:
           -p:EnableCodeSigning=false
           -p:CodesignRequireProvisioningProfile=false
 
+      # El objetivo Compile no copia nada a bin, asi que en el registro solo se ve la linea
+      # de PdfSigner.Core y no la de la aplicacion. Sin esta comprobacion, un Compile que no
+      # llegara a compilar PdfSigner.App daria el trabajo por bueno sin haber comprobado
+      # nada: verde hueco, que es peor que rojo.
+      - name: Comprobar que se genero el ensamblado de iOS
+        run: |
+          dll=$(find src/PdfSigner.App/obj/Release/net10.0-ios -name 'PdfSigner.App.dll' | head -1)
+          if [ -z "$dll" ]; then
+            echo "No se genero ningun ensamblado de iOS. Esto es lo que hay:"
+            find src/PdfSigner.App/obj/Release/net10.0-ios -maxdepth 3 | head -40
+            exit 1
+          fi
+          ls -l "$dll"
+
   # --------------------------------------------------------------- Release
   publicar:
     name: Adjuntar a la Release
