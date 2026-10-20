@@ -248,7 +248,10 @@ jobs:
       # nada: verde hueco, que es peor que rojo.
       - name: Comprobar que se genero el ensamblado de iOS
         run: |
-          dll=$(find src/PdfSigner.App/obj/Release/net10.0-ios -name 'PdfSigner.App.dll' | head -1)
+          # Se excluyen ref y refint: ahi va el ensamblado de REFERENCIA, solo metadatos.
+          # Encontrarlo ya probaria que el compilador trabajo, pero el que importa es el de
+          # implementacion, y buscar "el primero que aparezca" devolvia el de referencia.
+          dll=$(find src/PdfSigner.App/obj/Release/net10.0-ios -name 'PdfSigner.App.dll'                   -not -path '*/ref/*' -not -path '*/refint/*' | head -1)
           if [ -z "$dll" ]; then
             echo "No se genero ningun ensamblado de iOS. Esto es lo que hay:"
             find src/PdfSigner.App/obj/Release/net10.0-ios -maxdepth 3 | head -40
