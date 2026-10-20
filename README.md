@@ -165,12 +165,29 @@ dotnet test tests/PdfSigner.Core.Tests/PdfSigner.Core.Tests.csproj
 3. **Añadir firma** para colocar una imagen PNG o JPG. Arrástrala para moverla y usa
    cualquiera de las **cuatro asas de las esquinas** para cambiar su tamaño: la esquina
    opuesta se queda donde está.
-4. **Añadir texto** para un bloque multilínea, con tamaño y una paleta de colores.
+4. **Añadir texto** y luego **toca el documento donde quieras escribir**: ahí aparece un
+   bloque vacío con el cursor ya dentro. Para corregirlo después, tócalo una vez para
+   seleccionarlo y otra para volver a escribir. Toca fuera para terminar. El tamaño y el
+   color se ajustan en el panel de propiedades.
+
+   El texto se dibuja en pantalla al **mismo tamaño que tendrá en el PDF**, así que lo que
+   ves colocado es lo que se exporta.
+
+   Sirve también para **rellenar formularios que no son formularios**: muchos PDF traen las
+   líneas impresas pero no campos de verdad, y entonces no hay nada que la aplicación pueda
+   detectar. Un bloque de texto colocado sobre la línea hace el mismo trabajo.
 5. **Deshacer** (↶) retrocede el último movimiento, cambio de tamaño o borrado.
 6. **Exportar**: diálogo de guardado en escritorio, hoja de compartir en móvil.
 
+Para acercarte están los botones **− / +** de la barra inferior y **Ajustar**, que devuelve
+la página entera a la ventana. En escritorio funciona además **Ctrl + rueda del ratón**, que
+amplía hacia donde tengas el puntero; en pantalla táctil, el pellizco de siempre. Acercarse
+hace falta sobre todo para rellenar formularios: un campo corriente mide unos pocos
+milímetros y con la página entera en pantalla no se puede trabajar en él.
+
 Al seleccionar un elemento aparecen sus propiedades: en escritorio, en una columna fija a
-la derecha; en móvil, en un panel que sube desde abajo. Sobre la página flota además una
+la derecha; en móvil, en un panel que sube desde abajo. Tocar fuera del elemento suelta la
+selección y retira la barra flotante. Sobre la página flota además una
 barra con las acciones que dependen de lo seleccionado.
 
 Cada firma y cada texto quedan **anclados a la página donde los colocaste**, así que puedes

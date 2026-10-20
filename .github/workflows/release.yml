@@ -173,18 +173,20 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # La numeracion de .NET para iOS y la de Xcode NO se corresponden: el SDK 26.5 exige
-      # Xcode 26.6. Y el runner no tiene runtime de simulador para 26.6, solo para 26.2,
-      # 26.4 y 26.5. Por eso se compila para DISPOSITIVO mas abajo: un build de dispositivo
-      # no necesita ningun runtime de simulador.
+      # El SDK de .NET para iOS exige una version EXACTA de Xcode, y su numeracion no se
+      # corresponde con la de Xcode. Se usa el que trae .NET 10 de serie (familia 26.0), que
+      # pide Xcode 26.0.x: es la misma combinacion con la que compila el trabajo de macOS.
       #
-      # Ademas no vale cualquier carpeta: /Applications/Xcode.app resulto no tener el SDK de
-      # macOS, y sin el, actool no se puede localizar. Se comprueba antes de elegir.
+      # No vale cualquier carpeta: /Applications/Xcode.app resulto no tener el SDK de macOS,
+      # y sin el no se puede localizar actool. Se comprueba antes de elegir.
+      #
+      # Se compila para DISPOSITIVO mas abajo porque asi no hace falta ningun runtime de
+      # simulador, que el runner no tiene para todas las versiones.
       - name: Preparar Xcode
         run: |
           ls /Applications | grep -i '^Xcode' || true
           echo "--- cuales tienen el SDK de macOS ---"
-          for c in /Applications/Xcode_26.6.app /Applications/Xcode_26.6.0.app /Applications/Xcode.app; do
+          for c in /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app /Applications/Xcode.app; do
             if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
               echo "  OK  $c"
             else
@@ -193,38 +195,69 @@ jobs:
           done
 
           elegido=""
-          for c in /Applications/Xcode_26.6.app /Applications/Xcode_26.6.0.app /Applications/Xcode.app; do
+          for c in /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app /Applications/Xcode.app; do
             if [ -d "$c/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
               elegido="$c"
               break
             fi
           done
           if [ -z "$elegido" ]; then
-            echo "Ningun Xcode 26.6 con el SDK de macOS completo"; exit 1
+            echo "Ningun Xcode de la familia 26.0 con el SDK de macOS completo"; exit 1
           fi
           echo "Usando $elegido"
           sudo xcode-select -s "$elegido"
           xcodebuild -version
 
-      - name: Instalar y actualizar workloads de MAUI
+      # NO se ejecuta "dotnet workload update". Traia el Microsoft.iOS.Sdk mas reciente, que
+      # hoy es la familia 27.1 y exige Xcode 27.1: el runner no pasa de 26.6, asi que el
+      # build fallaba antes de empezar. Cuando se escribio, la actualizacion hacia falta
+      # porque el SDK incluido era mas viejo que el Xcode del runner; ahora es al reves.
+      #
+      # Con --skip-manifest-update se usa el SDK que viene con .NET 10, que es el mismo con
+      # el que compila el trabajo de macOS. "workload list" deja la version en el registro
+      # para que el proximo desajuste se vea de un vistazo.
+      - name: Instalar workloads de MAUI
         run: |
           dotnet workload install maui --skip-manifest-update
-          # La actualizacion trae el Microsoft.iOS.Sdk mas reciente, que es lo que puede
-          # aceptar el Xcode del runner.
-          dotnet workload update
           dotnet workload list
 
-      # Para dispositivo y no para simulador: asi no hace falta ningun runtime de simulador,
-      # que es lo que no tiene el runner para la version de Xcode que exige el SDK. La firma
-      # va desactivada porque no hay cuenta de Apple; el objetivo es unicamente comprobar
-      # que el codigo de iOS es valido.
-      - name: Compilar para dispositivo
+      # Solo el objetivo Compile: compila el C# y el XAML para iOS y se detiene ahi.
+      #
+      # No es por ahorrar tiempo. El empaquetado invoca actool, la herramienta de Apple que
+      # compila el catalogo de iconos, y actool exige un runtime de simulador que case con el
+      # Xcode seleccionado. El runner trae runtimes que no corresponden al Xcode que el SDK
+      # de .NET obliga a usar, y no hay forma de satisfacer las dos condiciones a la vez: el
+      # SDK ata la version de Xcode, y la imagen del runner decide que runtimes hay.
+      #
+      # LO QUE ESTO COMPRUEBA: que el codigo de iOS compila. LO QUE NO: el empaquetado, la
+      # firma y el catalogo de recursos. Nadie puede distribuir iOS en este proyecto de todas
+      # formas, porque eso exige una cuenta de desarrollador de Apple; cuando la haya, habra
+      # que volver a montar el empaquetado y comprobarlo en un Mac de verdad.
+      - name: Compilar el codigo de iOS
         run: >
           dotnet build src/PdfSigner.App/PdfSigner.App.csproj
           -f net10.0-ios -c Release
+          -t:Compile
           -p:RuntimeIdentifier=ios-arm64
           -p:EnableCodeSigning=false
           -p:CodesignRequireProvisioningProfile=false
+
+      # El objetivo Compile no copia nada a bin, asi que en el registro solo se ve la linea
+      # de PdfSigner.Core y no la de la aplicacion. Sin esta comprobacion, un Compile que no
+      # llegara a compilar PdfSigner.App daria el trabajo por bueno sin haber comprobado
+      # nada: verde hueco, que es peor que rojo.
+      - name: Comprobar que se genero el ensamblado de iOS
+        run: |
+          # Se excluyen ref y refint: ahi va el ensamblado de REFERENCIA, solo metadatos.
+          # Encontrarlo ya probaria que el compilador trabajo, pero el que importa es el de
+          # implementacion, y buscar "el primero que aparezca" devolvia el de referencia.
+          dll=$(find src/PdfSigner.App/obj/Release/net10.0-ios -name 'PdfSigner.App.dll'                   -not -path '*/ref/*' -not -path '*/refint/*' | head -1)
+          if [ -z "$dll" ]; then
+            echo "No se genero ningun ensamblado de iOS. Esto es lo que hay:"
+            find src/PdfSigner.App/obj/Release/net10.0-ios -maxdepth 3 | head -40
+            exit 1
+          fi
+          ls -l "$dll"
 
   # --------------------------------------------------------------- Release
   publicar:

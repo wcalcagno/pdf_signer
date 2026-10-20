@@ -136,8 +136,8 @@ public sealed partial class MainViewModel : ObservableObject
             NotificarHistorial();
 
             using var probe = new MemoryStream(_pdfBytes);
-            var geometry = _signer.Inspect(probe);
-            for (var i = 0; i < geometry.Count; i++)
+            _geometrias = _signer.Inspect(probe);
+            for (var i = 0; i < _geometrias.Count; i++)
                 Pages.Add(new PageViewModel(i));
 
             CargarFormulario();
@@ -183,7 +183,8 @@ public sealed partial class MainViewModel : ObservableObject
 
         using (var probe = new MemoryStream(_pdfBytes))
         {
-            for (var i = 0; i < _signer.Inspect(probe).Count; i++)
+            _geometrias = _signer.Inspect(probe);
+            for (var i = 0; i < _geometrias.Count; i++)
                 Pages.Add(new PageViewModel(i));
         }
 
@@ -249,6 +250,13 @@ public sealed partial class MainViewModel : ObservableObject
             FontSizePt = 10,
             ColorHex = "#14145A",
         }));
+
+        if (Services.DemoContent.ExportarDemo)
+        {
+            var salida = Path.Combine(Path.GetTempPath(), "pdfsigner-demo-export.pdf");
+            File.WriteAllBytes(salida, await GenerarPdfAsync());
+            Status = $"Exportado a {salida}. Zoom {Zoom * 100:0}% · lienzo {DisplayWidth:0}x{DisplayHeight:0}";
+        }
 
         if (Services.DemoContent.SimularArrastre && Selected is not null)
             Selected.IsDragging = true;
@@ -353,22 +361,90 @@ public sealed partial class MainViewModel : ObservableObject
         Status = "Arrastra la firma a su sitio y ajusta el tamaño con la esquina.";
     }
 
+    /// <summary>Queda a la espera de que el usuario señale dónde quiere escribir.</summary>
+    /// <remarks>
+    /// Antes el bloque aparecía siempre en el mismo rincón, pensado para el pie de firma, y
+    /// había que arrastrarlo hasta su sitio. Para rellenar un formulario eso es un estorbo:
+    /// cada dato va en una línea distinta. Ahora el botón arma la colocación y el siguiente
+    /// toque sobre el documento decide el lugar.
+    /// </remarks>
     [RelayCommand]
     private void AddText()
     {
         if (!HasDocument)
             return;
 
+        IsPlacingText = true;
+        Status = "Toca el documento donde quieras escribir.";
+    }
+
+    /// <summary>Se está esperando el toque que coloca un bloque de texto nuevo.</summary>
+    [ObservableProperty]
+    public partial bool IsPlacingText { get; set; }
+
+    /// <summary>
+    /// Coloca un bloque de texto en el punto señalado, en píxeles del lienzo.
+    /// </summary>
+    /// <remarks>
+    /// El punto queda en el CENTRO vertical del bloque, no en su esquina: al rellenar un
+    /// formulario se toca sobre la línea impresa, y lo que se espera es que el texto quede
+    /// escrito encima de ella.
+    /// </remarks>
+    /// <returns>False si el toque cae fuera de la página, y entonces no se coloca nada.</returns>
+    public bool TryPlaceTextAt(double x, double y)
+    {
+        if (!HasDocument || DisplayWidth <= 0 || DisplayHeight <= 0)
+            return false;
+
+        if (x < 0 || y < 0 || x > DisplayWidth || y > DisplayHeight)
+            return false;
+
         var element = new TextElement
         {
             PageIndex = CurrentPageIndex,
-            Bounds = new NormalizedRect(0.12, 0.78, 0.45, 0.10),
-            Text = "Nombre y apellidos\nCargo\nFirmado el {fecha}",
+
+            // Nace vacio y no con un texto de ejemplo. El ejemplo habia que borrarlo antes
+            // de escribir, y seleccionarlo entero al abrir el editor para que se sustituyera
+            // al teclear no funciona: en Windows, SelectionLength del Editor de MAUI no se
+            // aplica y el texto nuevo acababa pegado al final del de ejemplo. Vacio no hay
+            // nada que deshacer, y para la firma de siempre esta "Usar favorita".
+            Text = string.Empty,
         };
 
-        Register(new ElementViewModel(element));
-        Status = "Toca el bloque para editarlo. {fecha} se sustituye al exportar.";
+        // El alto se deriva del tamaño de letra para que la caja sea del tamaño de lo que se
+        // va a escribir. Una caja fija de un 10% de la pagina tapaba varias lineas del
+        // formulario y no dejaba ver donde se estaba colocando.
+        var altoPagina = AlturaPaginaPt(CurrentPageIndex);
+        var alto = Math.Clamp(element.FontSizePt * 2.2 / altoPagina, 0.015, 0.2);
+
+        element.Bounds = new NormalizedRect(
+            x / DisplayWidth,
+            y / DisplayHeight - alto / 2,
+            0.3,
+            alto).Clamped();
+
+        var vm = new ElementViewModel(element) { IsEditing = true };
+
+        Register(vm);
+        IsPlacingText = false;
+        Status = "Escribe y toca fuera para terminar. {fecha} se sustituye al exportar.";
+        return true;
     }
+
+    public void CancelPlacingText()
+    {
+        if (!IsPlacingText)
+            return;
+
+        IsPlacingText = false;
+        Status = "Colocación cancelada.";
+    }
+
+    /// <summary>Alto de una página en puntos PDF, para convertir entre puntos y píxeles.</summary>
+    private double AlturaPaginaPt(int pagina) =>
+        pagina >= 0 && pagina < _geometrias.Count ? _geometrias[pagina].VisibleHeightPt : 842;
+
+    private IReadOnlyList<PageGeometry> _geometrias = [];
 
     [RelayCommand]
     private void DeleteSelected()
@@ -951,7 +1027,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void Register(ElementViewModel vm)
     {
-        vm.SetCanvasSize(DisplayWidth, DisplayHeight);
+        vm.SetCanvasSize(DisplayWidth, DisplayHeight, AlturaPaginaPt(vm.PageIndex));
         Elements.Add(vm);
         RefreshVisibleElements();
         Select(vm);
@@ -963,7 +1039,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         foreach (var element in Elements.Where(e => e.PageIndex == CurrentPageIndex))
         {
-            element.SetCanvasSize(DisplayWidth, DisplayHeight);
+            element.SetCanvasSize(DisplayWidth, DisplayHeight, AlturaPaginaPt(element.PageIndex));
             VisibleElements.Add(element);
         }
 
@@ -1000,6 +1076,43 @@ public sealed partial class MainViewModel : ObservableObject
         _viewportHeight = height;
     }
 
+    /// <summary>Límites de la ampliación, compartidos por todas las formas de cambiarla.</summary>
+    /// <remarks>
+    /// El máximo es alto a propósito: rellenar un campo de formulario de veinte puntos exige
+    /// acercarse bastante más de lo que hace falta para colocar una firma.
+    /// </remarks>
+    public const double ZoomMinimo = 0.2;
+
+    public const double ZoomMaximo = 5;
+
+    /// <summary>Ampliación actual en porcentaje, para mostrarla.</summary>
+    public string ZoomLabel => $"{Zoom * 100:0} %";
+
+    /// <summary>
+    /// Multiplica la ampliación y devuelve el factor REALMENTE aplicado.
+    /// </summary>
+    /// <remarks>
+    /// Devuelve el factor efectivo y no void porque al llegar al tope el zoom deja de crecer,
+    /// y quien quiera acompañar la ampliación con un desplazamiento necesita saber cuánto se
+    /// movió de verdad. Con el factor pedido, la página se descolocaría al forzar el límite.
+    /// </remarks>
+    public double ZoomBy(double factor)
+    {
+        var antes = Zoom;
+        Zoom = Math.Clamp(antes * factor, ZoomMinimo, ZoomMaximo);
+        return antes > 0 ? Zoom / antes : 1;
+    }
+
+    [RelayCommand]
+    private void ZoomIn() => ZoomBy(1.25);
+
+    [RelayCommand]
+    private void ZoomOut() => ZoomBy(1 / 1.25);
+
+    /// <summary>Vuelve a encajar la página entera. Es la salida de emergencia del zoom.</summary>
+    [RelayCommand]
+    private void ZoomReset() => ZoomToFit();
+
     /// <summary>Ajusta la ampliación para que la página entre entera en pantalla.</summary>
     /// <remarks>
     /// Sin esto, un A4 rasterizado a 1200 px se abre más grande que la ventana y el usuario
@@ -1015,7 +1128,7 @@ public sealed partial class MainViewModel : ObservableObject
             (_viewportWidth - margen) / CanvasWidth,
             (_viewportHeight - margen) / CanvasHeight);
 
-        Zoom = Math.Clamp(ajuste, 0.1, 2);
+        Zoom = Math.Clamp(ajuste, ZoomMinimo, 2);
     }
 
     partial void OnCanvasWidthChanged(double value) => PropagateCanvasSize();
@@ -1028,11 +1141,12 @@ public sealed partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(DisplayWidth));
         OnPropertyChanged(nameof(DisplayHeight));
+        OnPropertyChanged(nameof(ZoomLabel));
 
         // Los elementos trabajan en píxeles de pantalla, así que su lienzo de referencia es
         // el tamaño ya ampliado. Gracias a eso los gestos no necesitan dividir por el zoom.
         foreach (var element in Elements)
-            element.SetCanvasSize(DisplayWidth, DisplayHeight);
+            element.SetCanvasSize(DisplayWidth, DisplayHeight, AlturaPaginaPt(element.PageIndex));
 
         foreach (var campo in FormFields)
             campo.SetCanvasSize(DisplayWidth, DisplayHeight);

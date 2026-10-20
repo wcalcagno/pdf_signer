@@ -22,6 +22,11 @@ public partial class MainPage : ContentPage
 
         if (DeviceInfo.Current.Idiom != DeviceIdiom.Desktop)
             AplicarDisposicionMovil();
+
+#if WINDOWS
+        // El control nativo todavía no existe aquí, así que se espera a que el handler llegue.
+        PageHost.HandlerChanged += (_, _) => ConectarRuedaRaton();
+#endif
     }
 
 #if DEBUG
@@ -146,10 +151,88 @@ public partial class MainPage : ContentPage
 
     private bool _viewportConocido;
 
+    /// <summary>
+    /// Primer toque selecciona; el segundo, sobre un bloque ya seleccionado, abre la edición.
+    /// </summary>
+    /// <remarks>
+    /// Dos pasos y no uno porque el primer toque también sirve para agarrar el bloque y
+    /// moverlo: si tocar abriera directamente el teclado, colocar la firma sería un suplicio
+    /// en pantalla táctil. Es el mismo gesto que usa cualquier editor para renombrar algo.
+    /// </remarks>
     private void OnElementTapped(object? sender, TappedEventArgs e)
     {
+        if (Resolve(sender) is not { } vm)
+            return;
+
+        if (vm.IsText && vm.IsSelected)
+        {
+            EditarBloque(vm, sender);
+            return;
+        }
+
+        _vm.Select(vm);
+    }
+
+    private void EditarBloque(ElementViewModel vm, object? origen)
+    {
+        vm.IsEditing = true;
+
+        // El editor es HERMANO del borde tocado, no hijo suyo: dentro quedaría recortado a la
+        // altura del bloque, que en una línea son unos pocos píxeles.
+        if ((origen as Element)?.Parent is Grid contenedor
+            && contenedor.Children.OfType<Editor>().FirstOrDefault() is { } editor)
+        {
+            Enfocar(editor);
+        }
+    }
+
+    /// <summary>Pone el cursor en un bloque que nace ya abierto para escribir.</summary>
+    /// <remarks>
+    /// Es el caso de "Anadir texto": el bloque aparece y hay que poder teclear en el acto. El
+    /// editor no existe hasta que la plantilla se despliega, asi que el foco se pide aqui y no
+    /// al crearlo.
+    /// </remarks>
+    private void OnElementEditorLoaded(object? sender, EventArgs e)
+    {
+        if (sender is Editor editor && Resolve(editor) is { IsEditing: true })
+            Enfocar(editor);
+    }
+
+    /// <summary>Pide el foco en el siguiente ciclo del despachador.</summary>
+    /// <remarks>
+    /// Aplazado porque en el momento de la llamada el editor todavia esta oculto, y un control
+    /// invisible no acepta el foco: sin esto haria falta tocar dos veces.
+    /// </remarks>
+    private void Enfocar(Editor editor) => Dispatcher.Dispatch(() => editor.Focus());
+
+    private void OnElementEditDone(object? sender, FocusEventArgs e)
+    {
         if (Resolve(sender) is { } vm)
-            _vm.Select(vm);
+            vm.IsEditing = false;
+    }
+
+    /// <summary>
+    /// El toque en el fondo coloca el bloque de texto pendiente, o suelta la selección.
+    /// </summary>
+    /// <remarks>
+    /// La posición se pide respecto de PageHost y no del control tocado: PageHost es la
+    /// página, así que sus coordenadas se convierten a proporción dividiendo por el tamaño
+    /// mostrado, sin tener que contar el zoom ni el desplazamiento del ScrollView.
+    /// </remarks>
+    private void OnCanvasTapped(object? sender, TappedEventArgs e)
+    {
+        if (!_vm.IsPlacingText)
+        {
+            _vm.Select(null);
+            return;
+        }
+
+        // Un toque fuera de la página cancela en vez de colocar el bloque en un borde: quien
+        // pincha el gris no está señalando un sitio del documento.
+        if (e.GetPosition(PageHost) is { } punto && _vm.TryPlaceTextAt(punto.X, punto.Y))
+            return;
+
+        _vm.CancelPlacingText();
     }
 
     private void OnElementPan(object? sender, PanUpdatedEventArgs e)
@@ -245,6 +328,62 @@ public partial class MainPage : ContentPage
         "BottomLeft" => ResizeCorner.BottomLeft,
         _ => ResizeCorner.BottomRight,
     };
+
+#if WINDOWS
+    /// <summary>
+    /// Conecta Ctrl + rueda del ratón al zoom.
+    /// </summary>
+    /// <remarks>
+    /// MAUI no tiene gesto de rueda, así que hay que bajar al control nativo. Es específico de
+    /// Windows a propósito: en móvil está el pellizco, y en Mac el zoom del trackpad llega ya
+    /// como pellizco.
+    ///
+    /// El manejador se engancha al contenedor de la PÁGINA y no al ScrollView. En WinUI el
+    /// evento sube desde donde está el puntero, así que marcándolo como atendido ahí el
+    /// ScrollView ya no lo ve y no desplaza el documento además de ampliarlo. Enganchándolo al
+    /// ScrollView, éste ya habría desplazado antes de que nos llegara el turno.
+    /// </remarks>
+    private void ConectarRuedaRaton()
+    {
+        if (_ruedaConectada || PageHost.Handler?.PlatformView is not Microsoft.UI.Xaml.UIElement nativo)
+            return;
+
+        nativo.PointerWheelChanged += OnRuedaRaton;
+        _ruedaConectada = true;
+    }
+
+    private bool _ruedaConectada;
+
+    private void OnRuedaRaton(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        var elemento = (Microsoft.UI.Xaml.UIElement)sender;
+        var punto = e.GetCurrentPoint(elemento);
+
+        var control = Microsoft.UI.Input.InputKeyboardSource
+            .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+
+        // Sin Ctrl la rueda es lo que espera cualquiera: desplazar el documento.
+        if (!control.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+            return;
+
+        var factor = _vm.ZoomBy(punto.Properties.MouseWheelDelta > 0 ? 1.15 : 1 / 1.15);
+        e.Handled = true;
+
+        if (Math.Abs(factor - 1) < 0.0001)
+            return;
+
+        // Se acompaña con el desplazamiento para que el punto del documento que está bajo el
+        // puntero siga estándolo. Sin esto, acercarse para rellenar un campo pequeño lo saca
+        // de la vista y hay que ir a buscarlo, que es justo lo contrario de lo que se pedía.
+        var destinoX = CanvasScroll.ScrollX + punto.Position.X * (factor - 1);
+        var destinoY = CanvasScroll.ScrollY + punto.Position.Y * (factor - 1);
+
+        // Aplazado: la página todavía no ha cambiado de tamaño, y hasta que no lo haga el
+        // ScrollView no admite el recorrido nuevo y recortaría el destino.
+        Dispatcher.Dispatch(async () =>
+            await CanvasScroll.ScrollToAsync(Math.Max(0, destinoX), Math.Max(0, destinoY), false));
+    }
+#endif
 
     private void OnPagePinch(object? sender, PinchGestureUpdatedEventArgs e)
     {

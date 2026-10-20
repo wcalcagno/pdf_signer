@@ -16,6 +16,7 @@ public sealed partial class ElementViewModel : ObservableObject
 
     private double _canvasWidth;
     private double _canvasHeight;
+    private double _pixelesPorPunto = 1;
 
     [ObservableProperty]
     public partial bool IsSelected { get; set; }
@@ -85,15 +86,28 @@ public sealed partial class ElementViewModel : ObservableObject
     public ImageSource? Preview =>
         ImageData is { Length: > 0 } data ? ImageSource.FromStream(() => new MemoryStream(data)) : null;
 
-    /// <summary>Informa del tamaño en píxeles de la página mostrada.</summary>
-    public void SetCanvasSize(double width, double height)
+    /// <summary>Informa del tamaño en píxeles de la página mostrada y de su alto real.</summary>
+    /// <param name="pageHeightPt">
+    /// Alto de la página en puntos PDF. Es lo que permite saber cuántos píxeles de pantalla
+    /// vale un punto, y sin eso la vista previa no puede dibujar el texto a su tamaño.
+    /// </param>
+    public void SetCanvasSize(double width, double height, double pageHeightPt)
     {
-        if (Math.Abs(_canvasWidth - width) < 0.5 && Math.Abs(_canvasHeight - height) < 0.5)
+        var escala = pageHeightPt > 0 ? height / pageHeightPt : 1;
+
+        if (Math.Abs(_canvasWidth - width) < 0.5
+            && Math.Abs(_canvasHeight - height) < 0.5
+            && Math.Abs(_pixelesPorPunto - escala) < 0.0001)
+        {
             return;
+        }
 
         _canvasWidth = width;
         _canvasHeight = height;
+        _pixelesPorPunto = escala;
+
         NotifyGeometryChanged();
+        NotifyTextChanged();
     }
 
     /// <summary>Desplaza el elemento. Los incrementos llegan en píxeles de pantalla.</summary>
@@ -135,12 +149,15 @@ public sealed partial class ElementViewModel : ObservableObject
         OnPropertyChanged(nameof(HitPosition));
         OnPropertyChanged(nameof(HitWidth));
         OnPropertyChanged(nameof(HitHeight));
+        OnPropertyChanged(nameof(EditHeight));
     }
 
     public void NotifyTextChanged()
     {
         OnPropertyChanged(nameof(DisplayText));
+        OnPropertyChanged(nameof(IsEmptyText));
         OnPropertyChanged(nameof(FontSize));
+        OnPropertyChanged(nameof(EditFontSize));
         OnPropertyChanged(nameof(TextColor));
     }
 
@@ -196,13 +213,78 @@ public sealed partial class ElementViewModel : ObservableObject
     /// El elemento conserva el <c>{fecha}</c> sin resolver; la sustitución de verdad ocurre al
     /// exportar. Aquí se resuelve únicamente para que el usuario vea cómo va a quedar.
     /// </remarks>
-    public string DisplayText =>
-        AsText is { } t ? PlaceholderResolver.Resolve(t.Text, DateTime.Now) : string.Empty;
+    public string DisplayText => AsText is not { } t
+        ? string.Empty
+        : string.IsNullOrWhiteSpace(t.Text)
+            ? PistaVacia
+            : PlaceholderResolver.Resolve(t.Text, DateTime.Now);
 
-    public double FontSize => AsText?.FontSizePt ?? 11;
+    /// <summary>Lo que se lee en un bloque todavía sin escribir.</summary>
+    /// <remarks>
+    /// Un bloque vacío no se dibuja, y sin esto se quedaría invisible sobre la página en
+    /// cuanto se deselecciona: existiría, ocuparía sitio y no habría forma de volver a
+    /// encontrarlo. No se exporta: el texto en blanco no genera contenido en el PDF.
+    /// </remarks>
+    public const string PistaVacia = "Escribe aquí";
 
-    public Color TextColor =>
-        AsText is { } t && Color.TryParse(t.ColorHex, out var color) ? color : Colors.Black;
+    public bool IsEmptyText => IsText && string.IsNullOrWhiteSpace(AsText?.Text);
+
+    /// <summary>
+    /// Tamaño de letra de la vista previa, en píxeles de pantalla.
+    /// </summary>
+    /// <remarks>
+    /// Los puntos del PDF NO son píxeles de pantalla. Antes aquí se devolvía el tamaño en
+    /// puntos tal cual, y el bloque se veía de un tamaño que no era el que acababa teniendo:
+    /// el desajuste dependía del zoom y cambiaba de signo en torno al 50%, de modo que al
+    /// acercarse para escribir sobre una línea el texto se veía MÁS PEQUEÑO de lo que luego
+    /// salía. Colocado a ojo, el PDF exportado se desbordaba.
+    ///
+    /// Convertido con la escala de la página, lo que se ve en pantalla es lo que queda.
+    /// </remarks>
+    public double FontSize => (AsText?.FontSizePt ?? 11) * _pixelesPorPunto;
+
+    /// <summary>Tamaño de letra mientras se escribe, con un mínimo legible.</summary>
+    /// <remarks>
+    /// Con la página alejada, el tamaño fiel puede quedar en cuatro o cinco píxeles: cierto,
+    /// pero imposible de teclear. Solo afecta al editor, no a lo que se dibuja ni a lo que se
+    /// exporta, así que nadie se lleva una sorpresa al guardar.
+    /// </remarks>
+    public double EditFontSize => Math.Max(FontSize, 13);
+
+    // ---- Edicion sobre la propia pagina ----
+
+    /// <summary>El bloque esta abierto para escribir en el.</summary>
+    /// <remarks>
+    /// Editar en el inspector obliga a mirar a otro sitio mientras se escribe, y eso importa
+    /// cuando lo que se escribe tiene que caer encima de una linea impresa del documento. En
+    /// la pagina se ve al momento si el texto cabe y si esta a la altura correcta.
+    /// </remarks>
+    [ObservableProperty]
+    public partial bool IsEditing { get; set; }
+
+    public bool IsNotEditing => !IsEditing;
+
+    /// <summary>Alto que se le pide al editor mientras se escribe.</summary>
+    /// <remarks>
+    /// Un bloque recien puesto puede ser mas bajo de lo que el control nativo necesita para
+    /// dibujar su texto, sobre todo con la pagina alejada. Se agranda solo mientras se edita;
+    /// el bloque de verdad conserva su tamaño.
+    /// </remarks>
+    public double EditHeight => Math.Max(Height, 44);
+
+    partial void OnIsEditingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsNotEditing));
+
+        // Escribir y arrastrar a la vez no tiene sentido, y el arrastre dejaria el bloque
+        // agrandado mientras se teclea.
+        if (value)
+            IsDragging = false;
+    }
+
+    public Color TextColor => IsEmptyText
+        ? Color.FromArgb("#8E8E93")
+        : AsText is { } t && Color.TryParse(t.ColorHex, out var color) ? color : Colors.Black;
 
     // ---- Apariencia de la selección y del arrastre ----
     //
@@ -237,9 +319,12 @@ public sealed partial class ElementViewModel : ObservableObject
 
     partial void OnIsSelectedChanged(bool value)
     {
-        // Soltar la selección cancela cualquier arrastre en curso.
+        // Soltar la selección cancela cualquier arrastre y cierra la edición en curso.
         if (!value)
+        {
             IsDragging = false;
+            IsEditing = false;
+        }
 
         OnPropertyChanged(nameof(OutlineColor));
         OnPropertyChanged(nameof(OutlineThickness));

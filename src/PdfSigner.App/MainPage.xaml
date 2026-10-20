@@ -274,9 +274,29 @@
               Style="{StaticResource RegionCanvas}"
               SizeChanged="OnCanvasResized">
 
+            <!-- El gris de alrededor tambien deselecciona: para quien mira, todo lo que no
+                 sea la firma es "fuera". -->
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnCanvasTapped" />
+            </Grid.GestureRecognizers>
+
             <!-- Capa 1: la página, con desplazamiento y zoom. -->
-            <ScrollView Orientation="Both">
-                <Grid Padding="24" HorizontalOptions="Center" VerticalOptions="Center">
+            <ScrollView x:Name="CanvasScroll" Orientation="Both">
+                <!--
+                    El toque en el fondo deselecciona. Sin esto, la barra flotante se queda
+                    sobre el documento tapando texto hasta que se elige otra cosa, y lo que
+                    hace cualquiera para quitarla es pinchar fuera.
+
+                    Va en este contenedor y no en el de la pagina para que valga tambien el
+                    margen gris de alrededor.
+                -->
+                <Grid Padding="24"
+                      HorizontalOptions="Center"
+                      VerticalOptions="Center"
+                      BackgroundColor="Transparent">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnCanvasTapped" />
+                    </Grid.GestureRecognizers>
                     <!--
                         El zoom cambia el TAMAÑO de la página, no su Scale. Scale no afecta al
                         layout: el hueco seguiría midiendo lo original, el ScrollView calcularía
@@ -348,11 +368,40 @@
                                                 <Label Text="{Binding DisplayText}"
                                                        FontSize="{Binding FontSize}"
                                                        TextColor="{Binding TextColor}"
-                                                       IsVisible="{Binding IsText}"
+                                                       IsVisible="{Binding IsNotEditing}"
                                                        LineBreakMode="WordWrap" />
+
                                             </Grid>
                                         </Border>
 
+
+                                        <!--
+                                            El editor va FUERA del Border, como hermano suyo.
+                                            Dentro queda recortado a la altura del bloque, y
+                                            un bloque de una linea mide unos pocos pixeles con
+                                            la pagina alejada: el editor se veia como una
+                                            rendija y no se podia teclear en el. Aqui puede
+                                            crecer hasta un alto legible sin tocar el tamaño
+                                            real del elemento.
+
+                                            Muestra el texto CRUDO, con {fecha} sin resolver,
+                                            que es lo que hay que poder corregir; la etiqueta
+                                            de dentro enseña como va a quedar.
+                                        -->
+                                        <Editor IsVisible="{Binding IsEditing}"
+                                                Text="{Binding Text, Mode=TwoWay}"
+                                                Placeholder="Escribe aquí"
+                                                PlaceholderColor="{StaticResource TextoTenue}"
+                                                FontSize="{Binding EditFontSize}"
+                                                TextColor="{Binding TextColor}"
+                                                Margin="{Binding HitPadding}"
+                                                HeightRequest="{Binding EditHeight}"
+                                                MinimumHeightRequest="0"
+                                                AutoSize="Disabled"
+                                                VerticalOptions="Start"
+                                                BackgroundColor="{StaticResource RealceCampo}"
+                                                Loaded="OnElementEditorLoaded"
+                                                Unfocused="OnElementEditDone" />
                                         <!--
                                             Una asa por esquina. ClassId identifica cuál es:
                                             dentro de una plantilla no se puede usar x:Name, y
@@ -534,13 +583,55 @@
                  resuelva bien, que es lo que fallaba. -->
             <Grid Grid.Row="1"
                   Padding="12,8"
-                  ColumnDefinitions="*,Auto"
+                  ColumnDefinitions="*,Auto,Auto"
                   MinimumHeightRequest="34"
                   BackgroundColor="{AppThemeBinding Light={StaticResource FondoNavegador}, Dark={StaticResource FondoNavegadorOscuro}}">
                 <Label Text="{Binding Status}" Style="{StaticResource EtiquetaEstado}" />
-                <ActivityIndicator Grid.Column="1"
+
+                <!--
+                    Los controles de zoom van aqui y no en la barra de arriba porque no son
+                    una accion sobre el documento sino un ajuste de como se mira, igual que en
+                    cualquier visor. Ademas la barra de arriba ya compite por sitio.
+
+                    Hacen falta aunque exista el gesto de pellizco: en escritorio con raton no
+                    hay pellizco, y Ctrl+rueda no se descubre solo.
+                -->
+                <HorizontalStackLayout Grid.Column="1"
+                                       Spacing="4"
+                                       IsVisible="{Binding HasDocument}"
+                                       VerticalOptions="Center">
+
+                    <Button Text="−"
+                            Command="{Binding ZoomOutCommand}"
+                            Style="{StaticResource BotonZoom}"
+                            SemanticProperties.Description="Alejar"
+                            ToolTipProperties.Text="Alejar (Ctrl + rueda del ratón)" />
+
+                    <Label Text="{Binding ZoomLabel}"
+                           FontSize="12"
+                           WidthRequest="52"
+                           HorizontalTextAlignment="Center"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextoTenue}" />
+
+                    <Button Text="+"
+                            Command="{Binding ZoomInCommand}"
+                            Style="{StaticResource BotonZoom}"
+                            SemanticProperties.Description="Acercar"
+                            ToolTipProperties.Text="Acercar (Ctrl + rueda del ratón)" />
+
+                    <Button Text="Ajustar"
+                            Command="{Binding ZoomResetCommand}"
+                            FontSize="12"
+                            Padding="10,0"
+                            HeightRequest="26"
+                            ToolTipProperties.Text="Encajar la página entera en la ventana" />
+                </HorizontalStackLayout>
+
+                <ActivityIndicator Grid.Column="2"
                                    IsRunning="{Binding IsBusy}"
                                    IsVisible="{Binding IsBusy}"
+                                   Margin="8,0,0,0"
                                    HeightRequest="16" WidthRequest="16" />
             </Grid>
         </Grid>
